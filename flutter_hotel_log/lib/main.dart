@@ -1242,7 +1242,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               ? 'New accounts are created with Reception access.'
                               : 'Sign in to continue to the hotel key log.',
                           style: const TextStyle(
-                            color: Color(0xFF71809A),
+                            color: Color(0xFF475569),
                             fontSize: 13,
                             height: 1.4,
                           ),
@@ -1257,6 +1257,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 TextFormField(
                   key: const ValueKey('auth:Full name'),
                   controller: _displayNameController,
+                  style: const TextStyle(color: Color(0xFF0D1D3A)),
                   textCapitalization: TextCapitalization.words,
                   decoration: _authDecoration(
                     'Full name',
@@ -1271,6 +1272,7 @@ class _AuthScreenState extends State<AuthScreen> {
               TextFormField(
                 key: const ValueKey('auth:Username'),
                 controller: _usernameController,
+                style: const TextStyle(color: Color(0xFF0D1D3A)),
                 textInputAction: TextInputAction.next,
                 autocorrect: false,
                 decoration: _authDecoration('Username', Icons.person_outline),
@@ -1280,6 +1282,7 @@ class _AuthScreenState extends State<AuthScreen> {
               TextFormField(
                 key: const ValueKey('auth:Password'),
                 controller: _passwordController,
+                style: const TextStyle(color: Color(0xFF0D1D3A)),
                 obscureText: _obscurePassword,
                 textInputAction:
                     _isSignUp ? TextInputAction.next : TextInputAction.done,
@@ -1324,6 +1327,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 TextFormField(
                   key: const ValueKey('auth:Re-type password'),
                   controller: _confirmPasswordController,
+                  style: const TextStyle(color: Color(0xFF0D1D3A)),
                   obscureText: _obscureConfirmPassword,
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _submit(),
@@ -1354,6 +1358,12 @@ class _AuthScreenState extends State<AuthScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF7A1426),
+                      textStyle: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     onPressed: _isSubmitting ? null : _showForgotPassword,
                     child: const Text('Forgot password?'),
                   ),
@@ -1479,7 +1489,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             : 'Connecting to sign-in service…',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
-                          color: Color(0xFF71809A),
+                          color: Color(0xFF475569),
                           fontSize: 12,
                         ),
                       ),
@@ -1492,13 +1502,17 @@ class _AuthScreenState extends State<AuthScreen> {
                   'Service may be starting. Sign-in retries automatically.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Color(0xFF71809A),
+                    color: Color(0xFF475569),
                     fontSize: 11,
                   ),
                 ),
               ],
               const SizedBox(height: 12),
               TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF7A1426),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w600),
+                ),
                 onPressed: _isSubmitting
                     ? null
                     : () => setState(() {
@@ -1534,15 +1548,29 @@ class _AuthScreenState extends State<AuthScreen> {
   }) =>
       InputDecoration(
         labelText: label,
+        labelStyle: const TextStyle(
+          color: Color(0xFF475569),
+          fontWeight: FontWeight.w500,
+        ),
+        floatingLabelStyle: const TextStyle(
+          color: Color(0xFF274A78),
+          fontWeight: FontWeight.w600,
+        ),
         hintText: 'Enter your ${label.toLowerCase()}',
         hintStyle: const TextStyle(
-          color: Color(0xFF98A5B9),
+          color: Color(0xFF526174),
           fontSize: 13,
         ),
-        prefixIcon: Icon(icon),
+        prefixIcon: Icon(icon, color: const Color(0xFF526174)),
         suffixIcon: suffix,
+        errorStyle: const TextStyle(
+          color: Color(0xFF9D1C33),
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
         filled: true,
         fillColor: Colors.white,
+        errorMaxLines: 2,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         border: OutlineInputBorder(
@@ -2948,80 +2976,6 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                     child: _buildInventoryMetricsBox(),
                   ),
                   const SizedBox(height: 16),
-                  StaffPerformanceChart(metrics: _staffPerformanceMetrics),
-                  const SizedBox(height: 16),
-
-                  // Shift Engine Banner
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? RamadaColors.charcoalSurface
-                          : RamadaColors.goldContainer,
-                      borderRadius: BorderRadius.circular(13),
-                      border: Border.all(
-                        color: isDark
-                            ? RamadaColors.charcoalBorder
-                            : RamadaColors.gold.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.sync,
-                          color: isDark
-                              ? RamadaColors.goldLight
-                              : RamadaColors.burgundy,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Shift automation',
-                                style: TextStyle(
-                                  color: isDark
-                                      ? Colors.white
-                                      : RamadaColors.burgundyDark,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Unreturned keys carry forward at shift handover.',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: isDark
-                                      ? RamadaColors.charcoalMuted
-                                      : Colors.blueGrey,
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        FilledButton.tonal(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: RamadaColors.burgundy.withValues(
-                              alpha: isDark ? 0.25 : 0.1,
-                            ),
-                            foregroundColor: isDark
-                                ? RamadaColors.goldLight
-                                : RamadaColors.burgundy,
-                            visualDensity: VisualDensity.compact,
-                          ),
-                          onPressed: _triggerAutoCarryForward,
-                          child: const Text('Sync'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
                   KeyedSubtree(
                     key: _logsSectionKey,
                     child: Column(
@@ -3219,6 +3173,10 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  _buildShiftAutomationBanner(isDark),
+                  const SizedBox(height: 16),
+                  StaffPerformanceChart(metrics: _staffPerformanceMetrics),
                 ],
               ),
             ),
@@ -3407,6 +3365,69 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildShiftAutomationBanner(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color:
+            isDark ? RamadaColors.charcoalSurface : RamadaColors.goldContainer,
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(
+          color: isDark
+              ? RamadaColors.charcoalBorder
+              : RamadaColors.gold.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.sync,
+            color: isDark ? RamadaColors.goldLight : RamadaColors.burgundy,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Shift automation',
+                  style: TextStyle(
+                    color: isDark ? Colors.white : RamadaColors.burgundyDark,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Unreturned keys carry forward at shift handover.',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color:
+                        isDark ? RamadaColors.charcoalMuted : Colors.blueGrey,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          FilledButton.tonal(
+            style: FilledButton.styleFrom(
+              backgroundColor: RamadaColors.burgundy.withValues(
+                alpha: isDark ? 0.25 : 0.1,
+              ),
+              foregroundColor:
+                  isDark ? RamadaColors.goldLight : RamadaColors.burgundy,
+              visualDensity: VisualDensity.compact,
+            ),
+            onPressed: _triggerAutoCarryForward,
+            child: const Text('Sync'),
+          ),
+        ],
       ),
     );
   }

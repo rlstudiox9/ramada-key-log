@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../models/key_issuance.dart';
@@ -68,14 +70,24 @@ class StaffPerformanceChart extends StatefulWidget {
 class _StaffPerformanceChartState extends State<StaffPerformanceChart> {
   String? _hoveredStaff;
 
+  static const _colors = [
+    Color(0xFF8F2940),
+    Color(0xFFD49D3D),
+    Color(0xFF388A6A),
+    Color(0xFF4779B8),
+    Color(0xFF895DB1),
+    Color(0xFFCE6D49),
+    Color(0xFF3999A0),
+    Color(0xFFB5537B),
+    Color(0xFF6D7D45),
+    Color(0xFF6374B8),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final maxKeys = widget.metrics.fold<int>(
-      0,
-      (maximum, metric) =>
-          metric.keysIssued > maximum ? metric.keysIssued : maximum,
-    );
+    final totalKeys = widget.metrics
+        .fold<int>(0, (total, metric) => total + metric.keysIssued);
     final hoveredMetrics =
         widget.metrics.where((metric) => metric.staffName == _hoveredStaff);
     final hoveredMetric = hoveredMetrics.isEmpty ? null : hoveredMetrics.first;
@@ -94,7 +106,8 @@ class _StaffPerformanceChartState extends State<StaffPerformanceChart> {
           children: [
             Row(
               children: [
-                Icon(Icons.bar_chart_rounded, color: theme.colorScheme.primary),
+                Icon(Icons.donut_large_rounded,
+                    color: theme.colorScheme.primary),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -108,7 +121,7 @@ class _StaffPerformanceChartState extends State<StaffPerformanceChart> {
                       ),
                       Text(
                         hoveredMetric == null
-                            ? 'Total keys issued by staff • all recorded shifts'
+                            ? 'Issued key share • all recorded shifts'
                             : '${hoveredMetric.staffName} • '
                                 '${hoveredMetric.keysIssued} keys issued',
                         key: const ValueKey('staff-performance-hover-metric'),
@@ -127,34 +140,169 @@ class _StaffPerformanceChartState extends State<StaffPerformanceChart> {
                 'No key issuance data yet.',
                 style: theme.textTheme.bodyMedium,
               )
+            else if (totalKeys == 0)
+              Text(
+                'No key issuance data yet.',
+                style: theme.textTheme.bodyMedium,
+              )
             else
-              for (final metric in widget.metrics)
-                _StaffBarRow(
-                  metric: metric,
-                  maxKeys: maxKeys,
-                  hovered: _hoveredStaff == metric.staffName,
-                  onHover: (isHovered) {
-                    setState(() {
-                      _hoveredStaff = isHovered ? metric.staffName : null;
-                    });
-                  },
-                ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final chartSize =
+                      constraints.maxWidth < 300 ? constraints.maxWidth : 240.0;
+                  final chart = SizedBox(
+                    width: chartSize,
+                    height: chartSize,
+                    child: MouseRegion(
+                      key: const ValueKey('staff-performance-donut'),
+                      onHover: (event) {
+                        final hovered = _metricAtPosition(
+                          event.localPosition,
+                          Size(chartSize, chartSize),
+                        );
+                        if (_hoveredStaff != hovered?.staffName) {
+                          setState(() => _hoveredStaff = hovered?.staffName);
+                        }
+                      },
+                      onExit: (_) => setState(() => _hoveredStaff = null),
+                      child: Tooltip(
+                        key: const ValueKey('staff-performance-tooltip'),
+                        message: hoveredMetric == null
+                            ? 'Hover a slice to view staff totals'
+                            : '${hoveredMetric.staffName} • '
+                                '${hoveredMetric.keysIssued} '
+                                '${hoveredMetric.keysIssued == 1 ? 'key' : 'keys'} issued',
+                        waitDuration: Duration.zero,
+                        child: CustomPaint(
+                          painter: _DonutPainter(
+                            metrics: widget.metrics,
+                            totalKeys: totalKeys,
+                            hoveredStaff: _hoveredStaff,
+                            colors: _colors,
+                            trackColor:
+                                theme.dividerColor.withValues(alpha: 0.25),
+                          ),
+                          child: Center(
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 140),
+                              child: Column(
+                                key: ValueKey(
+                                  hoveredMetric?.staffName ?? 'total',
+                                ),
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    hoveredMetric == null
+                                        ? '$totalKeys'
+                                        : '${hoveredMetric.keysIssued}',
+                                    style:
+                                        theme.textTheme.headlineSmall?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      color: hoveredMetric == null
+                                          ? theme.colorScheme.onSurface
+                                          : _colorFor(hoveredMetric),
+                                    ),
+                                  ),
+                                  Text(
+                                    hoveredMetric == null
+                                        ? 'keys issued'
+                                        : 'keys',
+                                    style: theme.textTheme.bodySmall,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                  final legend = Wrap(
+                    spacing: 10,
+                    runSpacing: 8,
+                    children: [
+                      for (final metric in widget.metrics)
+                        _StaffLegendItem(
+                          metric: metric,
+                          color: _colorFor(metric),
+                          totalKeys: totalKeys,
+                          hovered: _hoveredStaff == metric.staffName,
+                          onHover: (hovered) {
+                            setState(() {
+                              _hoveredStaff = hovered ? metric.staffName : null;
+                            });
+                          },
+                        ),
+                    ],
+                  );
+                  if (constraints.maxWidth < 520) {
+                    return Column(
+                      children: [
+                        chart,
+                        const SizedBox(height: 12),
+                        SizedBox(width: double.infinity, child: legend),
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      chart,
+                      const SizedBox(width: 20),
+                      Expanded(child: legend),
+                    ],
+                  );
+                },
+              ),
           ],
         ),
       ),
     );
   }
+
+  Color _colorFor(StaffIssueMetric metric) {
+    final index = widget.metrics.indexOf(metric);
+    return _colors[index % _colors.length];
+  }
+
+  StaffIssueMetric? _metricAtPosition(Offset position, Size size) {
+    final total = widget.metrics.fold<int>(
+      0,
+      (sum, metric) => sum + metric.keysIssued,
+    );
+    if (total == 0) return null;
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final delta = position - center;
+    final radius = size.shortestSide * 0.38;
+    final distance = delta.distance;
+    if (distance < radius * 0.57 || distance > radius * 1.28) return null;
+
+    var angle = (math.atan2(delta.dy, delta.dx) + math.pi / 2) % (math.pi * 2);
+    if (angle < 0) angle += math.pi * 2;
+    var accumulatedAngle = 0.0;
+    for (final metric in widget.metrics) {
+      if (metric.keysIssued <= 0) continue;
+      final sweep = metric.keysIssued / total * math.pi * 2;
+      if (angle >= accumulatedAngle && angle < accumulatedAngle + sweep) {
+        return metric;
+      }
+      accumulatedAngle += sweep;
+    }
+    return null;
+  }
 }
 
-class _StaffBarRow extends StatelessWidget {
+class _StaffLegendItem extends StatelessWidget {
   final StaffIssueMetric metric;
-  final int maxKeys;
+  final int totalKeys;
+  final Color color;
   final bool hovered;
   final ValueChanged<bool> onHover;
 
-  const _StaffBarRow({
+  const _StaffLegendItem({
     required this.metric,
-    required this.maxKeys,
+    required this.totalKeys,
+    required this.color,
     required this.hovered,
     required this.onHover,
   });
@@ -162,87 +310,119 @@ class _StaffBarRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final barColor = theme.colorScheme.primary;
-    final fraction =
-        maxKeys == 0 ? 0.0 : metric.keysIssued / maxKeys.toDouble();
+    final share = totalKeys == 0 ? 0 : metric.keysIssued / totalKeys * 100;
     return Tooltip(
       message: '${metric.staffName} • ${metric.keysIssued} '
           '${metric.keysIssued == 1 ? 'key' : 'keys'} issued',
       waitDuration: Duration.zero,
       child: MouseRegion(
         key: ValueKey(
-          'staff-performance-row:${metric.staffName.toLowerCase()}',
+          'staff-performance-legend:${metric.staffName.toLowerCase()}',
         ),
         onEnter: (_) => onHover(true),
         onExit: (_) => onHover(false),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 140),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          margin: const EdgeInsets.only(bottom: 1),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           decoration: BoxDecoration(
-            color: hovered
-                ? barColor.withValues(alpha: 0.09)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(9),
+            color: hovered ? color.withValues(alpha: 0.12) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
           ),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final nameWidth = (constraints.maxWidth * 0.34).clamp(72.0, 130.0);
-              return Row(
-                children: [
-                  SizedBox(
-                    width: nameWidth,
-                    child: Text(
-                      metric.staffName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight:
-                            hovered ? FontWeight.w700 : FontWeight.w500,
-                      ),
-                    ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 11,
+                height: 11,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 7),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 140),
+                child: Text(
+                  metric.staffName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: hovered ? FontWeight.w700 : FontWeight.w500,
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(5),
-                      child: Container(
-                        height: 10,
-                        color: theme.dividerColor.withValues(alpha: 0.45),
-                        alignment: Alignment.centerLeft,
-                        child: FractionallySizedBox(
-                          widthFactor: fraction,
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            decoration: BoxDecoration(
-                              color: hovered
-                                  ? barColor
-                                  : barColor.withValues(alpha: 0.76),
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    width: 36,
-                    child: Text(
-                      '${metric.keysIssued}',
-                      textAlign: TextAlign.end,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: hovered ? barColor : null,
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '${metric.keysIssued} (${share.toStringAsFixed(0)}%)',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: hovered ? color : theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+}
+
+class _DonutPainter extends CustomPainter {
+  final List<StaffIssueMetric> metrics;
+  final int totalKeys;
+  final String? hoveredStaff;
+  final List<Color> colors;
+  final Color trackColor;
+
+  const _DonutPainter({
+    required this.metrics,
+    required this.totalKeys,
+    required this.hoveredStaff,
+    required this.colors,
+    required this.trackColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.shortestSide * 0.38;
+    final strokeWidth = size.shortestSide * 0.16;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    final trackPaint = Paint()
+      ..color = trackColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+    canvas.drawCircle(center, radius, trackPaint);
+
+    if (totalKeys == 0) return;
+    var startAngle = -math.pi / 2;
+    for (var index = 0; index < metrics.length; index++) {
+      final metric = metrics[index];
+      if (metric.keysIssued <= 0) continue;
+      final sweepAngle = metric.keysIssued / totalKeys * math.pi * 2;
+      final isHovered = metric.staffName == hoveredStaff;
+      final paint = Paint()
+        ..color = colors[index % colors.length].withValues(
+          alpha: hoveredStaff == null || isHovered ? 1 : 0.36,
+        )
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.butt
+        ..strokeWidth = isHovered ? strokeWidth + 5 : strokeWidth;
+      canvas.drawArc(
+        rect,
+        startAngle + 0.012,
+        math.max(0, sweepAngle - 0.024),
+        false,
+        paint,
+      );
+      startAngle += sweepAngle;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DonutPainter oldDelegate) =>
+      oldDelegate.metrics != metrics ||
+      oldDelegate.totalKeys != totalKeys ||
+      oldDelegate.hoveredStaff != hoveredStaff ||
+      oldDelegate.trackColor != trackColor;
 }
