@@ -139,18 +139,91 @@ class RamadaKeyLogApp extends StatefulWidget {
   State<RamadaKeyLogApp> createState() => _RamadaKeyLogAppState();
 }
 
-class _RamadaKeyLogAppState extends State<RamadaKeyLogApp> {
+class _RamadaKeyLogAppState extends State<RamadaKeyLogApp>
+    with WidgetsBindingObserver {
+  static const _idleLogoutDuration = Duration(minutes: 10);
+
   ThemeMode _themeMode = ThemeMode.light;
   late final ApiService _apiService;
   AuthSession? _session;
   bool _isRestoringSession = true;
   String? _authError;
+  Timer? _idleLogoutTimer;
+  DateTime? _lastActivityAt;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _apiService = widget.apiService ?? ApiService();
     _restoreSession();
+  }
+
+  @override
+  void dispose() {
+    _idleLogoutTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _session != null) {
+      _scheduleIdleLogout();
+    }
+  }
+
+  void _recordUserActivity() {
+    if (_session == null) return;
+    _lastActivityAt = DateTime.now();
+    _scheduleIdleLogout();
+  }
+
+  void _scheduleIdleLogout() {
+    _idleLogoutTimer?.cancel();
+    if (_session == null) return;
+
+    final lastActivity = _lastActivityAt ?? DateTime.now();
+    _lastActivityAt = lastActivity;
+    final remaining =
+        _idleLogoutDuration - DateTime.now().difference(lastActivity);
+    if (remaining <= Duration.zero) {
+      unawaited(_logoutForInactivity());
+      return;
+    }
+    _idleLogoutTimer =
+        Timer(remaining, () => unawaited(_logoutForInactivity()));
+  }
+
+  Future<void> _logoutForInactivity() async {
+    final session = _session;
+    if (session == null) return;
+
+    _idleLogoutTimer?.cancel();
+    _idleLogoutTimer = null;
+    _lastActivityAt = null;
+    _apiService.accessToken = null;
+    if (mounted) {
+      setState(() {
+        _session = null;
+        _authError =
+            'Signed out after 10 minutes of inactivity. Please sign in again.';
+      });
+    }
+
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.remove('auth_access_token');
+    } catch (error, stackTrace) {
+      debugPrint('Could not clear the idle session token: $error\n$stackTrace');
+    }
+    unawaited(() async {
+      try {
+        await _apiService.logout(token: session.accessToken);
+      } catch (error, stackTrace) {
+        debugPrint('Server idle sign-out failed: $error\n$stackTrace');
+      }
+    }());
   }
 
   Future<void> _restoreSession() async {
@@ -169,6 +242,8 @@ class _RamadaKeyLogAppState extends State<RamadaKeyLogApp> {
           _session = AuthSession(accessToken: token, user: user);
           _isRestoringSession = false;
         });
+        _lastActivityAt = DateTime.now();
+        _scheduleIdleLogout();
       }
     } catch (error, stackTrace) {
       debugPrint('Could not restore sign-in session: $error\n$stackTrace');
@@ -194,11 +269,16 @@ class _RamadaKeyLogAppState extends State<RamadaKeyLogApp> {
       _authError = null;
       _session = session;
     });
+    _lastActivityAt = DateTime.now();
+    _scheduleIdleLogout();
   }
 
   Future<void> _signOut() async {
     final session = _session;
     if (session == null) return;
+    _idleLogoutTimer?.cancel();
+    _idleLogoutTimer = null;
+    _lastActivityAt = null;
     try {
       await _apiService.logout(token: session.accessToken);
     } catch (error, stackTrace) {
@@ -213,6 +293,9 @@ class _RamadaKeyLogAppState extends State<RamadaKeyLogApp> {
   }
 
   Future<void> _expireSession() async {
+    _idleLogoutTimer?.cancel();
+    _idleLogoutTimer = null;
+    _lastActivityAt = null;
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove('auth_access_token');
     _apiService.accessToken = null;
@@ -232,6 +315,26 @@ class _RamadaKeyLogAppState extends State<RamadaKeyLogApp> {
       title: 'Ramada Keys - Doha Old Town',
       debugShowCheckedModeBanner: false,
       themeMode: _themeMode,
+      builder: (context, child) {
+        if (_session == null) return child ?? const SizedBox.shrink();
+        return Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (_) => _recordUserActivity(),
+          onPointerMove: (_) => _recordUserActivity(),
+          onPointerHover: (_) => _recordUserActivity(),
+          onPointerSignal: (_) => _recordUserActivity(),
+          child: Focus(
+            canRequestFocus: false,
+            onKeyEvent: (_, event) {
+              if (event is KeyDownEvent || event is KeyRepeatEvent) {
+                _recordUserActivity();
+              }
+              return KeyEventResult.ignored;
+            },
+            child: child ?? const SizedBox.shrink(),
+          ),
+        );
+      },
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,
@@ -329,12 +432,14 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isSubmitting = false;
+  bool _rememberUsername = false;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
     _errorMessage = widget.initialError;
+    unawaited(_restoreRememberedUsername());
   }
 
   @override
@@ -363,6 +468,50 @@ class _AuthScreenState extends State<AuthScreen> {
     return null;
   }
 
+  Future<void> _restoreRememberedUsername() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final remember = preferences.getBool('remember_username') ?? false;
+      if (!mounted) return;
+      setState(() {
+        _rememberUsername = remember;
+        if (remember) {
+          _usernameController.text =
+              preferences.getString('remembered_username') ?? '';
+        }
+      });
+    } catch (error, stackTrace) {
+      debugPrint('Could not restore remembered username: $error\n$stackTrace');
+    }
+  }
+
+  Future<void> _setRememberUsername(bool remember) async {
+    setState(() => _rememberUsername = remember);
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setBool('remember_username', remember);
+      if (!remember) await preferences.remove('remembered_username');
+    } catch (error, stackTrace) {
+      debugPrint('Could not update remembered username: $error\n$stackTrace');
+    }
+  }
+
+  Future<void> _saveRememberedUsername() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      if (_rememberUsername) {
+        await preferences.setString(
+          'remembered_username',
+          _usernameController.text.trim(),
+        );
+      } else {
+        await preferences.remove('remembered_username');
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Could not save remembered username: $error\n$stackTrace');
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
@@ -380,6 +529,7 @@ class _AuthScreenState extends State<AuthScreen> {
               username: _usernameController.text.trim(),
               password: _passwordController.text,
             );
+      if (!_isSignUp) await _saveRememberedUsername();
       await widget.onAuthenticated(session);
     } catch (error, stackTrace) {
       debugPrint('Authentication request failed: $error\n$stackTrace');
@@ -600,7 +750,7 @@ class _AuthScreenState extends State<AuthScreen> {
       );
 
   Widget _buildLoginFooter({required bool isWide}) {
-    final brand = const Text(
+    const brand = Text(
       '◈  Ramada by Wyndham  ·  Doha Old Town',
       key: ValueKey('login-footer-brand'),
       style: TextStyle(color: Color(0xFFD4DCE9), fontSize: 11),
@@ -1093,6 +1243,23 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
                 validator: _isSignUp ? _validatePassword : null,
               ),
+              if (!_isSignUp)
+                CheckboxListTile(
+                  key: const ValueKey('auth:remember-username'),
+                  value: _rememberUsername,
+                  onChanged: _isSubmitting
+                      ? null
+                      : (value) {
+                          if (value != null) {
+                            unawaited(_setRememberUsername(value));
+                          }
+                        },
+                  title: const Text('Remember username on this device'),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  visualDensity: VisualDensity.compact,
+                ),
               if (_isSignUp) ...[
                 const SizedBox(height: 14),
                 TextFormField(
@@ -1340,10 +1507,13 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
   String? _storageError;
   String? _inventorySyncError;
   bool _isRefreshingInventory = false;
+  bool _isCheckingDailyReport = false;
+  String? _dailyReportError;
   String? _lastActiveDate;
   String? _lastActiveShift;
   Timer? _inventoryRefreshTimer;
   Timer? _activeShiftTimer;
+  Timer? _dailyReportTimer;
 
   final List<String> shifts = [
     "Morning (07:00 - 15:00)",
@@ -1367,12 +1537,17 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
       const Duration(minutes: 1),
       (_) => _refreshActiveShift(),
     );
+    _dailyReportTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _checkForDailyReport(),
+    );
   }
 
   @override
   void dispose() {
     _inventoryRefreshTimer?.cancel();
     _activeShiftTimer?.cancel();
+    _dailyReportTimer?.cancel();
     super.dispose();
   }
 
@@ -1413,7 +1588,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
       selectedDate = DateFormat('yyyy-MM-dd').format(now);
       selectedShift = _shiftFor(now);
       _lastActiveDate = selectedDate;
-      _lastActiveShift = selectedShift;
+      _lastActiveShift = _shiftFor(now);
       dutyStaffName = preferences.getString('duty_staff_name') ?? dutyStaffName;
       staffRoster = await widget.apiService.getStaffRoster(
         token: widget.session.accessToken,
@@ -1423,11 +1598,80 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
       );
       issuances = await widget.apiService.getLogs();
       await _syncCarryForward();
+      final savedShift = preferences.getString('staff_selected_shift');
+      if (!widget.session.user.isAdmin &&
+          savedShift != null &&
+          shifts.contains(savedShift) &&
+          preferences.getString('staff_selected_shift_date') == selectedDate) {
+        selectedShift = savedShift;
+      }
     } catch (error, stackTrace) {
       debugPrint('Failed to load key logs from API: $error\n$stackTrace');
       _storageError = 'Key logs could not be loaded from the API: $error';
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+    if (mounted) unawaited(_checkForDailyReport());
+  }
+
+  Future<void> _checkForDailyReport() async {
+    if (_isLoading || _isCheckingDailyReport) return;
+    _isCheckingDailyReport = true;
+    try {
+      final report = await widget.apiService.getLatestDailyReport();
+      if (report == null || !mounted) return;
+
+      final preferences = await SharedPreferences.getInstance();
+      final lastDownloaded =
+          preferences.getString('last_daily_report_downloaded') ?? '';
+      if (report.reportDate.compareTo(lastDownloaded) <= 0) {
+        if (_dailyReportError != null) {
+          setState(() => _dailyReportError = null);
+        }
+        return;
+      }
+
+      downloadTextFile(
+        report.csvContent,
+        'ramada-key-log-daily-${report.reportDate}.csv',
+        'text/csv;charset=utf-8',
+      );
+      await preferences.setString(
+        'last_daily_report_downloaded',
+        report.reportDate,
+      );
+      if (!mounted) return;
+      setState(() => _dailyReportError = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              Text('Daily key log report downloaded (${report.reportDate}).'),
+          action: SnackBarAction(
+            label: 'Download again',
+            onPressed: () => downloadTextFile(
+              report.csvContent,
+              'ramada-key-log-daily-${report.reportDate}.csv',
+              'text/csv;charset=utf-8',
+            ),
+          ),
+        ),
+      );
+    } catch (error, stackTrace) {
+      debugPrint(
+          'Failed to retrieve daily key log report: $error\n$stackTrace');
+      if (!mounted) return;
+      final message = 'Daily report unavailable: $error';
+      if (_dailyReportError != message) {
+        setState(() => _dailyReportError = message);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
+      if (error is ApiException && error.statusCode == 401) {
+        unawaited(widget.onSessionExpired());
+      }
+    } finally {
+      _isCheckingDailyReport = false;
     }
   }
 
@@ -1526,6 +1770,24 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
     );
     await _refreshLogs();
     return carriedCount;
+  }
+
+  Future<void> _selectShift(String shift) async {
+    setState(() => selectedShift = shift);
+    if (widget.session.user.isAdmin) return;
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString('staff_selected_shift', shift);
+      await preferences.setString('staff_selected_shift_date', selectedDate);
+    } catch (error, stackTrace) {
+      debugPrint('Failed to save selected duty shift: $error\n$stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Duty shift selection could not be saved: $error')),
+        );
+      }
+    }
   }
 
   Future<void> _openManageStaffRoster() async {
@@ -1804,13 +2066,18 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
   }
 
   Future<void> _confirmDeleteLog(KeyIssuanceItem item) async {
-    if (!widget.session.user.isAdmin) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete key log?'),
+        title: Text(
+          widget.session.user.isAdmin
+              ? 'Delete key log?'
+              : 'Delete key log with audit record?',
+        ),
         content: Text(
-          'Delete the entry for ${item.roomOrAccess}? This cannot be undone.',
+          widget.session.user.isAdmin
+              ? 'Delete the entry for ${item.roomOrAccess}? This cannot be undone.'
+              : 'Delete the entry for ${item.roomOrAccess}? The before-image and your account will be recorded in the audit log.',
         ),
         actions: [
           TextButton(
@@ -1831,32 +2098,44 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
     if (confirmed != true) return;
 
     try {
-      await widget.apiService.adminDeleteLog(
-        item.id,
-        accessToken: widget.session.accessToken,
-      );
-      if (mounted) {
-        setState(() => issuances.removeWhere((entry) => entry.id == item.id));
+      if (widget.session.user.isAdmin) {
+        await widget.apiService.adminDeleteLog(
+          item.id,
+          accessToken: widget.session.accessToken,
+        );
+      } else {
+        await widget.apiService.deleteLog(
+          item.id,
+          accessToken: widget.session.accessToken,
+        );
       }
+      await _refreshLogs();
     } catch (error, stackTrace) {
       _reportApiError(error, stackTrace);
     }
   }
 
   Future<void> _openEditDialog(KeyIssuanceItem item) async {
-    if (!widget.session.user.isAdmin) return;
+    final isAdmin = widget.session.user.isAdmin;
     final updatedItem = await showDialog<KeyIssuanceItem>(
       context: context,
-      builder: (dialogContext) => AdminEditDialog(
-        item: item,
-      ),
+      builder: (dialogContext) => isAdmin
+          ? AdminEditDialog(item: item)
+          : StaffCorrectionDialog(item: item),
     );
     if (updatedItem == null) return;
     try {
-      await widget.apiService.adminUpdateLog(
-        updatedItem,
-        accessToken: widget.session.accessToken,
-      );
+      if (isAdmin) {
+        await widget.apiService.adminUpdateLog(
+          updatedItem,
+          accessToken: widget.session.accessToken,
+        );
+      } else {
+        await widget.apiService.correctLog(
+          updatedItem,
+          accessToken: widget.session.accessToken,
+        );
+      }
       await _refreshLogs();
     } catch (error, stackTrace) {
       _reportApiError(error, stackTrace);
@@ -2227,32 +2506,65 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
             const SizedBox(height: 16),
 
             // Filters & Search
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.search),
-                      hintText: 'Search Room No (e.g. 405), Staff, Guest...',
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                    ),
-                    onChanged: (v) => setState(() => searchQuery = v),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final searchField = TextField(
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.search),
+                    hintText: 'Search Room No (e.g. 405), Staff, Guest...',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
-                ),
-                const SizedBox(width: 12),
-                DropdownButton<String>(
-                  value: selectedShift,
-                  items: shifts
-                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) setState(() => selectedShift = v);
-                  },
-                ),
-              ],
+                  onChanged: (v) => setState(() => searchQuery = v),
+                );
+                final shiftSelector = SizedBox(
+                  width: constraints.maxWidth < 680 ? double.infinity : 270,
+                  child: Tooltip(
+                    message: 'Select your duty shift',
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Duty Shift',
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                        border: OutlineInputBorder(),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          key: const ValueKey('dashboard:duty-shift'),
+                          value: selectedShift,
+                          isExpanded: true,
+                          items: shifts
+                              .map((s) =>
+                                  DropdownMenuItem(value: s, child: Text(s)))
+                              .toList(),
+                          onChanged: (value) {
+                            if (value != null) unawaited(_selectShift(value));
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+                if (constraints.maxWidth < 680) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      searchField,
+                      const SizedBox(height: 12),
+                      shiftSelector,
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: searchField),
+                    const SizedBox(width: 12),
+                    shiftSelector,
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 12),
 
@@ -2577,6 +2889,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
           rows: filteredList.asMap().entries.map((entry) {
             final item = entry.value;
             final rowNumber = entry.key + 1;
+            final staffMayManage = !item.isCarriedForward && !item.isMissing;
             final statusColor = item.isMissing
                 ? (isDark ? const Color(0xFFFF9A9A) : RamadaColors.danger)
                 : (item.isFullyReturned
@@ -2634,9 +2947,11 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                 DataCell(
                   Row(
                     children: [
-                      if (widget.session.user.isAdmin)
+                      if (widget.session.user.isAdmin || staffMayManage)
                         IconButton(
-                          tooltip: 'Edit log',
+                          tooltip: widget.session.user.isAdmin
+                              ? 'Edit log'
+                              : 'Correct log (audited)',
                           icon: const Icon(Icons.edit_outlined, size: 18),
                           onPressed: () => _openEditDialog(item),
                         ),
@@ -2651,9 +2966,11 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                           child: const Text('Return',
                               style: TextStyle(fontSize: 11)),
                         ),
-                      if (widget.session.user.isAdmin)
+                      if (widget.session.user.isAdmin || staffMayManage)
                         IconButton(
-                          tooltip: 'Delete log',
+                          tooltip: widget.session.user.isAdmin
+                              ? 'Delete log'
+                              : 'Delete log (audited)',
                           icon: const Icon(Icons.delete_outline, size: 18),
                           onPressed: () => _confirmDeleteLog(item),
                         ),
@@ -3598,6 +3915,133 @@ class _AddIssuanceDialogState extends State<AddIssuanceDialog> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Text('Issue'),
+        ),
+      ],
+    );
+  }
+}
+
+class StaffCorrectionDialog extends StatefulWidget {
+  final KeyIssuanceItem item;
+
+  const StaffCorrectionDialog({
+    super.key,
+    required this.item,
+  });
+
+  @override
+  State<StaffCorrectionDialog> createState() => _StaffCorrectionDialogState();
+}
+
+class _StaffCorrectionDialogState extends State<StaffCorrectionDialog> {
+  late final TextEditingController _roomController;
+  late final TextEditingController _guestController;
+  late final TextEditingController _staffController;
+  late final TextEditingController _issuedQtyController;
+  late final TextEditingController _remarksController;
+  String? _validationError;
+
+  @override
+  void initState() {
+    super.initState();
+    final item = widget.item;
+    _roomController = TextEditingController(text: item.roomOrAccess);
+    _guestController = TextEditingController(text: item.guestOrHolderName);
+    _staffController = TextEditingController(text: item.issuingStaff);
+    _issuedQtyController =
+        TextEditingController(text: item.qtyIssued.toString());
+    _remarksController = TextEditingController(text: item.remarks);
+  }
+
+  @override
+  void dispose() {
+    _roomController.dispose();
+    _guestController.dispose();
+    _staffController.dispose();
+    _issuedQtyController.dispose();
+    _remarksController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final item = widget.item;
+    final qtyIssued = int.tryParse(_issuedQtyController.text);
+    if (_roomController.text.trim().isEmpty ||
+        _staffController.text.trim().isEmpty ||
+        qtyIssued == null ||
+        qtyIssued < item.qtyReturned) {
+      setState(() {
+        _validationError =
+            'Enter a room and staff name; issued quantity cannot be below keys already returned.';
+      });
+      return;
+    }
+
+    final correctedItem = KeyIssuanceItem.fromMap(item.toMap())
+      ..roomOrAccess = _roomController.text.trim()
+      ..guestOrHolderName = _guestController.text.trim()
+      ..issuingStaff = _staffController.text.trim()
+      ..qtyIssued = qtyIssued
+      ..remarks = _remarksController.text.trim();
+    Navigator.pop(context, correctedItem);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Correct Key Log'),
+      content: SizedBox(
+        width: 440,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Your correction will be recorded in the audit log.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              TextField(
+                controller: _roomController,
+                decoration: const InputDecoration(labelText: 'Room / Access'),
+              ),
+              TextField(
+                controller: _guestController,
+                decoration:
+                    const InputDecoration(labelText: 'Guest / Holder Name'),
+              ),
+              TextField(
+                controller: _staffController,
+                decoration: const InputDecoration(labelText: 'Staff Name'),
+              ),
+              TextField(
+                controller: _issuedQtyController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Qty Issued'),
+              ),
+              TextField(
+                controller: _remarksController,
+                decoration: const InputDecoration(labelText: 'Remarks'),
+              ),
+              if (_validationError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    _validationError!,
+                    style: const TextStyle(color: RamadaColors.danger),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _save,
+          child: const Text('Save Correction'),
         ),
       ],
     );

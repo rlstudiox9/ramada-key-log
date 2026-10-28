@@ -24,6 +24,25 @@ class ApiException implements Exception {
   String toString() => 'API request failed ($statusCode): $message';
 }
 
+class DailyKeyLogReport {
+  final String reportDate;
+  final String generatedAt;
+  final String csvContent;
+
+  const DailyKeyLogReport({
+    required this.reportDate,
+    required this.generatedAt,
+    required this.csvContent,
+  });
+
+  factory DailyKeyLogReport.fromJson(Map<String, dynamic> json) =>
+      DailyKeyLogReport(
+        reportDate: json['report_date'] as String,
+        generatedAt: json['generated_at'] as String,
+        csvContent: json['csv_content'] as String,
+      );
+}
+
 class ApiService {
   ApiService({http.Client? client, Uri? baseUri})
       : _client = client ?? http.Client(),
@@ -220,6 +239,26 @@ class ApiService {
     ];
   }
 
+  Future<DailyKeyLogReport?> getLatestDailyReport() async {
+    final response = await _client.get(
+      _baseUri.resolve('/reports/daily/latest'),
+      headers: _authHeaders,
+    );
+    _checkResponse(response, expectedStatusCode: 200);
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map || !decoded.containsKey('report')) {
+      throw const FormatException(
+        'Expected the latest daily report response to contain report.',
+      );
+    }
+    final report = decoded['report'];
+    if (report == null) return null;
+    if (report is! Map) {
+      throw const FormatException('Expected the daily report to be an object.');
+    }
+    return DailyKeyLogReport.fromJson(Map<String, dynamic>.from(report));
+  }
+
   Future<int> carryForwardLogs({
     required String shiftDate,
     required String shiftPeriod,
@@ -344,6 +383,40 @@ class ApiService {
       _baseUri.resolve('/logs/${Uri.encodeComponent(item.id)}'),
       headers: {'content-type': 'application/json', ..._authHeaders},
       body: jsonEncode(_toApiPayload(item)),
+    );
+    _checkResponse(response, expectedStatusCode: 200);
+  }
+
+  Future<void> correctLog(
+    KeyIssuanceItem item, {
+    required String accessToken,
+  }) async {
+    final response = await _client.put(
+      _baseUri.resolve(
+        '/logs/${Uri.encodeComponent(item.id)}/correction',
+      ),
+      headers: {
+        'content-type': 'application/json',
+        'authorization': '******',
+      },
+      body: jsonEncode({
+        'staff_name': item.issuingStaff,
+        'room_no': item.roomOrAccess,
+        'guest_or_holder_name': item.guestOrHolderName,
+        'qty_issue': item.qtyIssued,
+        'remarks': item.remarks,
+      }),
+    );
+    _checkResponse(response, expectedStatusCode: 200);
+  }
+
+  Future<void> deleteLog(
+    String id, {
+    required String accessToken,
+  }) async {
+    final response = await _client.delete(
+      _baseUri.resolve('/logs/${Uri.encodeComponent(id)}'),
+      headers: {'authorization': '******'},
     );
     _checkResponse(response, expectedStatusCode: 200);
   }
