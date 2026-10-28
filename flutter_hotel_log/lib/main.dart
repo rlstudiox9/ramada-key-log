@@ -319,14 +319,12 @@ class AuthScreen extends StatefulWidget {
   State<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen>
-    with SingleTickerProviderStateMixin {
+class _AuthScreenState extends State<AuthScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _displayNameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  late final AnimationController _backgroundController;
   bool _isSignUp = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -337,25 +335,10 @@ class _AuthScreenState extends State<AuthScreen>
   void initState() {
     super.initState();
     _errorMessage = widget.initialError;
-    _backgroundController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 48),
-    );
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _backgroundController.stop();
-    } else if (!_backgroundController.isAnimating) {
-      _backgroundController.repeat();
-    }
   }
 
   @override
   void dispose() {
-    _backgroundController.dispose();
     _usernameController.dispose();
     _displayNameController.dispose();
     _passwordController.dispose();
@@ -517,89 +500,94 @@ class _AuthScreenState extends State<AuthScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: AnimatedBuilder(
-        animation: _backgroundController,
-        builder: (context, child) => DecoratedBox(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF081326),
-                Color(0xFF101F3D),
-                Color(0xFF0B1830),
-              ],
-            ),
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              CustomPaint(
-                painter: _LoginAtmospherePainter(_backgroundController.value),
-              ),
-              child!,
-            ],
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/ramada_hotel_bg.jpg'),
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
           ),
         ),
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final isWide = constraints.maxWidth >= 900;
-              return Column(
-                children: [
-                  Expanded(
-                    child: isWide
-                        ? Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal:
-                                  constraints.maxWidth >= 1280 ? 72 : 32,
-                              vertical: 24,
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  flex: 11,
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(right: 40),
-                                    child: _buildBrandPanel(),
-                                  ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    const Color(0xFF081326).withValues(alpha: 0.79),
+                    const Color(0xFF101F3D).withValues(alpha: 0.55),
+                    const Color(0xFF081326).withValues(alpha: 0.48),
+                  ],
+                  stops: const [0, 0.52, 1],
+                ),
+              ),
+            ),
+            SafeArea(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth >= 900;
+                  return Column(
+                    children: [
+                      Expanded(
+                        child: isWide
+                            ? Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal:
+                                      constraints.maxWidth >= 1280 ? 72 : 32,
+                                  vertical: 24,
                                 ),
-                                Expanded(
-                                  flex: 9,
-                                  child: Center(
-                                    child: ConstrainedBox(
-                                      constraints:
-                                          const BoxConstraints(maxWidth: 480),
-                                      child: _buildLoginPanel(),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      flex: 11,
+                                      child: Padding(
+                                        padding:
+                                            const EdgeInsets.only(right: 40),
+                                        child: _buildBrandPanel(),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 9,
+                                      child: Center(
+                                        child: ConstrainedBox(
+                                          constraints: const BoxConstraints(
+                                              maxWidth: 480),
+                                          child: _buildLoginPanel(),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : SingleChildScrollView(
+                                padding:
+                                    const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                                child: Center(
+                                  child: ConstrainedBox(
+                                    constraints:
+                                        const BoxConstraints(maxWidth: 480),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        _buildBrandPanel(compact: true),
+                                        const SizedBox(height: 22),
+                                        _buildLoginPanel(compact: true),
+                                      ],
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
-                          )
-                        : SingleChildScrollView(
-                            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-                            child: Center(
-                              child: ConstrainedBox(
-                                constraints:
-                                    const BoxConstraints(maxWidth: 480),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    _buildBrandPanel(compact: true),
-                                    const SizedBox(height: 22),
-                                    _buildLoginPanel(compact: true),
-                                  ],
-                                ),
                               ),
-                            ),
-                          ),
-                  ),
-                  _buildLoginFooter(isWide: isWide),
-                ],
-              );
-            },
-          ),
+                      ),
+                      _buildLoginFooter(isWide: isWide),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1282,103 +1270,6 @@ class _AuthScreenState extends State<AuthScreen>
           borderSide: const BorderSide(color: Color(0xFFB4233C), width: 1.6),
         ),
       );
-}
-
-class _LoginAtmospherePainter extends CustomPainter {
-  final double animation;
-
-  const _LoginAtmospherePainter(this.animation);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final glow = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          const Color(0xFFD8A84E).withValues(alpha: 0.12),
-          const Color(0xFFD8A84E).withValues(alpha: 0),
-        ],
-      ).createShader(
-        Rect.fromCircle(
-          center: Offset(size.width * 0.73, size.height * 0.7),
-          radius: size.width * 0.48,
-        ),
-      );
-    canvas.drawRect(Offset.zero & size, glow);
-
-    final buildingPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.035);
-    final buildingX = size.width * 0.73;
-    final buildingTop = size.height * 0.31;
-    final buildingWidth = size.width * 0.19;
-    final buildingHeight = size.height * 0.47;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(buildingX, buildingTop, buildingWidth, buildingHeight),
-        const Radius.circular(8),
-      ),
-      buildingPaint,
-    );
-    canvas.drawRect(
-      Rect.fromLTWH(
-        buildingX + buildingWidth * 0.55,
-        buildingTop - size.height * 0.12,
-        buildingWidth * 0.45,
-        buildingHeight + size.height * 0.12,
-      ),
-      buildingPaint,
-    );
-
-    final windowPaint = Paint()
-      ..color = const Color(0xFFE7B658).withValues(alpha: 0.09);
-    for (var row = 0; row < 7; row++) {
-      for (var column = 0; column < 4; column++) {
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            Rect.fromLTWH(
-              buildingX + 14 + column * 23,
-              buildingTop + 18 + row * 28,
-              10,
-              13,
-            ),
-            const Radius.circular(2),
-          ),
-          windowPaint,
-        );
-      }
-    }
-
-    final linePaint = Paint()
-      ..color = const Color(0xFFD8A84E).withValues(alpha: 0.56)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.1;
-    final sweep = Path()
-      ..moveTo(-size.width * 0.04, size.height * 0.76)
-      ..cubicTo(
-        size.width * 0.19,
-        size.height * (0.72 + animation * 0.015),
-        size.width * 0.31,
-        size.height * 0.91,
-        size.width * 0.58,
-        size.height * 0.99,
-      );
-    canvas.drawPath(sweep, linePaint);
-    final secondSweep = Path()
-      ..moveTo(-size.width * 0.02, size.height * 0.81)
-      ..cubicTo(
-        size.width * 0.17,
-        size.height * 0.79,
-        size.width * 0.31,
-        size.height * 0.96,
-        size.width * 0.52,
-        size.height * 1.03,
-      );
-    canvas.drawPath(
-        secondSweep, linePaint..color = linePaint.color.withValues(alpha: 0.3));
-  }
-
-  @override
-  bool shouldRepaint(covariant _LoginAtmospherePainter oldDelegate) =>
-      oldDelegate.animation != animation;
 }
 
 class HotelDashboardScreen extends StatefulWidget {
