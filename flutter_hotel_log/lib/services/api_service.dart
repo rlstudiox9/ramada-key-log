@@ -59,6 +59,17 @@ class ApiService {
   Map<String, String> get _authHeaders =>
       accessToken == null ? const {} : {'authorization': 'Bearer $accessToken'};
 
+  Future<bool> wakeBackend() async {
+    try {
+      final response = await _client
+          .get(_baseUri.resolve('/health'))
+          .timeout(const Duration(seconds: 60));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<AuthSession> login({
     required String username,
     required String password,
@@ -66,6 +77,7 @@ class ApiService {
     final response = await _authPost(
       _baseUri.resolve('/auth/login'),
       {'username': username, 'password': password},
+      retryTransientFailures: true,
     );
     _checkResponse(response, expectedStatusCode: 200);
     return AuthSession.fromJson(
@@ -308,6 +320,47 @@ class ApiService {
       for (final item in decoded)
         StaffRosterMember.fromJson(Map<String, dynamic>.from(item as Map)),
     ];
+  }
+
+  Future<String?> getStaffShiftAssignment({
+    required String shiftDate,
+    required String token,
+  }) async {
+    final response = await _client.get(
+      _baseUri.resolve('/staff/shift-assignment').replace(
+        queryParameters: {'shift_date': shiftDate},
+      ),
+      headers: {'authorization': 'Bearer $token'},
+    );
+    _checkResponse(response, expectedStatusCode: 200);
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map ||
+        (decoded['shift_period'] != null &&
+            decoded['shift_period'] is! String)) {
+      throw const FormatException(
+        'Expected shift assignment response to contain a shift period or null.',
+      );
+    }
+    return decoded['shift_period'] as String?;
+  }
+
+  Future<void> setStaffShiftAssignment({
+    required String shiftDate,
+    required String shiftPeriod,
+    required String token,
+  }) async {
+    final response = await _client.put(
+      _baseUri.resolve('/staff/shift-assignment'),
+      headers: {
+        'content-type': 'application/json',
+        'authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'shift_date': shiftDate,
+        'shift_period': shiftPeriod,
+      }),
+    );
+    _checkResponse(response, expectedStatusCode: 200);
   }
 
   Future<StaffRosterMember> addStaffRosterMember({
@@ -558,27 +611,51 @@ class ApiService {
     return stringValue == null || stringValue.isEmpty ? null : stringValue;
   }
 
-  Future<http.Response> _authPost(
-    Uri uri,
-    Map<String, String> body,
-  ) async {
-    try {
-      return await _client
-          .post(
-            uri,
-            headers: const {'content-type': 'application/json'},
-            body: jsonEncode(body),
-          )
-          .timeout(const Duration(seconds: 10));
-    } on TimeoutException {
-      throw const ApiException(0, _signInConnectionError);
-    } on http.ClientException {
-      throw const ApiException(0, _signInConnectionError);
-    } catch (error) {
-      if (network_errors.isSocketException(error)) {
+  Future<http.Response> _authPost(Uri uri, Map<String, String> body,
+      {bool retryTransientFailures = false}) async {
+    const retryDelays = [
+      Duration(milliseconds: 500),
+      Duration(seconds: 1),
+    ];
+    var attempt = 0;
+    while (true) {
+      try {
+        final response = await _client
+            .post(
+              uri,
+              headers: const {'content-type': 'application/json'},
+              body: jsonEncode(body),
+            )
+            .timeout(const Duration(seconds: 35));
+        if (retryTransientFailures &&
+            response.statusCode >= 500 &&
+            attempt < retryDelays.length) {
+          await Future<void>.delayed(retryDelays[attempt++]);
+          continue;
+        }
+        return response;
+      } on TimeoutException {
+        if (retryTransientFailures && attempt < retryDelays.length) {
+          await Future<void>.delayed(retryDelays[attempt++]);
+          continue;
+        }
         throw const ApiException(0, _signInConnectionError);
+      } on http.ClientException {
+        if (retryTransientFailures && attempt < retryDelays.length) {
+          await Future<void>.delayed(retryDelays[attempt++]);
+          continue;
+        }
+        throw const ApiException(0, _signInConnectionError);
+      } catch (error) {
+        if (network_errors.isSocketException(error)) {
+          if (retryTransientFailures && attempt < retryDelays.length) {
+            await Future<void>.delayed(retryDelays[attempt++]);
+            continue;
+          }
+          throw const ApiException(0, _signInConnectionError);
+        }
+        rethrow;
       }
-      rethrow;
     }
   }
 

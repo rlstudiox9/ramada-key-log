@@ -433,6 +433,8 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _obscureConfirmPassword = true;
   bool _isSubmitting = false;
   bool _rememberUsername = false;
+  bool _isWarmingBackend = true;
+  bool _backendWarmupFailed = false;
   String? _errorMessage;
 
   @override
@@ -440,6 +442,7 @@ class _AuthScreenState extends State<AuthScreen> {
     super.initState();
     _errorMessage = widget.initialError;
     unawaited(_restoreRememberedUsername());
+    unawaited(_warmBackend());
   }
 
   @override
@@ -466,6 +469,15 @@ class _AuthScreenState extends State<AuthScreen> {
     if ((value ?? '').length < 8) return 'Use at least 8 characters.';
     if ((value ?? '').length > 128) return 'Password is too long.';
     return null;
+  }
+
+  Future<void> _warmBackend() async {
+    final isAvailable = await widget.apiService.wakeBackend();
+    if (!mounted) return;
+    setState(() {
+      _isWarmingBackend = false;
+      _backendWarmupFailed = !isAvailable;
+    });
   }
 
   Future<void> _restoreRememberedUsername() async {
@@ -1402,6 +1414,42 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                 ),
               ),
+              if (_isWarmingBackend || _isSubmitting) ...[
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(
+                      width: 13,
+                      height: 13,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        _isSubmitting
+                            ? 'Connecting securely…'
+                            : 'Connecting to sign-in service…',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Color(0xFF71809A),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ] else if (_backendWarmupFailed) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'Service may be starting. Sign-in retries automatically.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF71809A),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               TextButton(
                 onPressed: _isSubmitting
@@ -1567,12 +1615,22 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
     _lastActiveDate = today;
     _lastActiveShift = currentShift;
 
-    if (!mounted) return;
-    setState(() {
-      selectedDate = today;
-      selectedShift = currentShift;
-    });
     try {
+      var shiftForToday = currentShift;
+      if (!widget.session.user.isAdmin) {
+        final assignedShift = await widget.apiService.getStaffShiftAssignment(
+          shiftDate: today,
+          token: widget.session.accessToken,
+        );
+        if (assignedShift != null && shifts.take(3).contains(assignedShift)) {
+          shiftForToday = assignedShift;
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        selectedDate = today;
+        selectedShift = shiftForToday;
+      });
       issuances = await widget.apiService.getLogs();
       await _syncCarryForward();
       if (mounted) setState(() => _storageError = null);
@@ -1597,14 +1655,20 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
         token: widget.session.accessToken,
       );
       issuances = await widget.apiService.getLogs();
-      await _syncCarryForward();
-      final savedShift = preferences.getString('staff_selected_shift');
-      if (!widget.session.user.isAdmin &&
-          savedShift != null &&
-          shifts.contains(savedShift) &&
-          preferences.getString('staff_selected_shift_date') == selectedDate) {
-        selectedShift = savedShift;
+      if (!widget.session.user.isAdmin) {
+        try {
+          final assignedShift = await widget.apiService.getStaffShiftAssignment(
+            shiftDate: selectedDate,
+            token: widget.session.accessToken,
+          );
+          if (assignedShift != null && shifts.take(3).contains(assignedShift)) {
+            selectedShift = assignedShift;
+          }
+        } catch (error, stackTrace) {
+          debugPrint('Could not restore assigned shift: $error\n$stackTrace');
+        }
       }
+      await _syncCarryForward();
     } catch (error, stackTrace) {
       debugPrint('Failed to load key logs from API: $error\n$stackTrace');
       _storageError = 'Key logs could not be loaded from the API: $error';
@@ -1773,15 +1837,20 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
   }
 
   Future<void> _selectShift(String shift) async {
+    final previousShift = selectedShift;
     setState(() => selectedShift = shift);
     if (widget.session.user.isAdmin) return;
+    if (shift == 'All Shifts' || selectedDate == 'ALL') return;
     try {
-      final preferences = await SharedPreferences.getInstance();
-      await preferences.setString('staff_selected_shift', shift);
-      await preferences.setString('staff_selected_shift_date', selectedDate);
+      await widget.apiService.setStaffShiftAssignment(
+        shiftDate: selectedDate,
+        shiftPeriod: shift,
+        token: widget.session.accessToken,
+      );
     } catch (error, stackTrace) {
       debugPrint('Failed to save selected duty shift: $error\n$stackTrace');
       if (mounted) {
+        setState(() => selectedShift = previousShift);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text('Duty shift selection could not be saved: $error')),
@@ -1791,12 +1860,12 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
   }
 
   Future<void> _openManageStaffRoster() async {
-    if (!widget.session.user.isAdmin) return;
     await showDialog<void>(
       context: context,
       builder: (context) => AdminStaffRosterDialog(
         apiService: widget.apiService,
         accessToken: widget.session.accessToken,
+        readOnly: !widget.session.user.isAdmin,
       ),
     );
     if (!mounted) return;
@@ -2370,15 +2439,16 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                         onPressed: () => widget.onLogout(),
                         icon: const Icon(Icons.logout, color: Colors.white),
                       ),
-                      if (widget.session.user.isAdmin)
-                        IconButton(
-                          tooltip: 'Manage staff roster',
-                          onPressed: _openManageStaffRoster,
-                          icon: const Icon(
-                            Icons.groups_outlined,
-                            color: RamadaColors.goldLight,
-                          ),
+                      IconButton(
+                        tooltip: widget.session.user.isAdmin
+                            ? 'Manage staff roster'
+                            : 'View staff roster',
+                        onPressed: _openManageStaffRoster,
+                        icon: const Icon(
+                          Icons.groups_outlined,
+                          color: RamadaColors.goldLight,
                         ),
+                      ),
                       if (widget.session.user.isAdmin)
                         IconButton(
                           tooltip: 'Change password',
@@ -2536,6 +2606,9 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                           value: selectedShift,
                           isExpanded: true,
                           items: shifts
+                              .where((shift) =>
+                                  widget.session.user.isAdmin ||
+                                  shift != 'All Shifts')
                               .map((s) =>
                                   DropdownMenuItem(value: s, child: Text(s)))
                               .toList(),
@@ -2889,7 +2962,6 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
           rows: filteredList.asMap().entries.map((entry) {
             final item = entry.value;
             final rowNumber = entry.key + 1;
-            final staffMayManage = !item.isCarriedForward && !item.isMissing;
             final statusColor = item.isMissing
                 ? (isDark ? const Color(0xFFFF9A9A) : RamadaColors.danger)
                 : (item.isFullyReturned
@@ -2947,14 +3019,13 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                 DataCell(
                   Row(
                     children: [
-                      if (widget.session.user.isAdmin || staffMayManage)
-                        IconButton(
-                          tooltip: widget.session.user.isAdmin
-                              ? 'Edit log'
-                              : 'Correct log (audited)',
-                          icon: const Icon(Icons.edit_outlined, size: 18),
-                          onPressed: () => _openEditDialog(item),
-                        ),
+                      IconButton(
+                        tooltip: widget.session.user.isAdmin
+                            ? 'Edit log'
+                            : 'Correct log (audited)',
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        onPressed: () => _openEditDialog(item),
+                      ),
                       if (item.isPending)
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
@@ -2966,14 +3037,13 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                           child: const Text('Return',
                               style: TextStyle(fontSize: 11)),
                         ),
-                      if (widget.session.user.isAdmin || staffMayManage)
-                        IconButton(
-                          tooltip: widget.session.user.isAdmin
-                              ? 'Delete log'
-                              : 'Delete log (audited)',
-                          icon: const Icon(Icons.delete_outline, size: 18),
-                          onPressed: () => _confirmDeleteLog(item),
-                        ),
+                      IconButton(
+                        tooltip: widget.session.user.isAdmin
+                            ? 'Delete log'
+                            : 'Delete log (audited)',
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        onPressed: () => _confirmDeleteLog(item),
+                      ),
                     ],
                   ),
                 ),
@@ -3044,11 +3114,13 @@ class AdminInventoryLimitDialog extends StatefulWidget {
 class AdminStaffRosterDialog extends StatefulWidget {
   final ApiService apiService;
   final String accessToken;
+  final bool readOnly;
 
   const AdminStaffRosterDialog({
     super.key,
     required this.apiService,
     required this.accessToken,
+    this.readOnly = false,
   });
 
   @override
@@ -3084,7 +3156,7 @@ class _AdminStaffRosterDialogState extends State<AdminStaffRosterDialog> {
     try {
       final members = await widget.apiService.getStaffRoster(
         token: widget.accessToken,
-        includeInactive: true,
+        includeInactive: !widget.readOnly,
       );
       if (mounted) setState(() => _members = members);
     } catch (error, stackTrace) {
@@ -3266,7 +3338,7 @@ class _AdminStaffRosterDialogState extends State<AdminStaffRosterDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: const Text('Manage Staff Roster'),
+        title: Text(widget.readOnly ? 'Staff Roster' : 'Manage Staff Roster'),
         content: SizedBox(
           width: 520,
           child: _isLoading
@@ -3280,33 +3352,36 @@ class _AdminStaffRosterDialogState extends State<AdminStaffRosterDialog> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    TextField(
-                      key: const ValueKey('roster:add-name'),
-                      controller: _nameController,
-                      decoration:
-                          const InputDecoration(labelText: 'New staff name'),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            key: const ValueKey('roster:add-hours'),
-                            controller: _hoursController,
-                            decoration: const InputDecoration(
-                              labelText: 'Shift hours',
-                              hintText: '08:00 - 17:00',
+                    if (!widget.readOnly) ...[
+                      TextField(
+                        key: const ValueKey('roster:add-name'),
+                        controller: _nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'New staff name',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              key: const ValueKey('roster:add-hours'),
+                              controller: _hoursController,
+                              decoration: const InputDecoration(
+                                labelText: 'Shift hours',
+                                hintText: '08:00 - 17:00',
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton.icon(
-                          onPressed: _isSaving ? null : _addMember,
-                          icon: const Icon(Icons.person_add_alt_1),
-                          label: const Text('Add'),
-                        ),
-                      ],
-                    ),
+                          const SizedBox(width: 8),
+                          FilledButton.icon(
+                            onPressed: _isSaving ? null : _addMember,
+                            icon: const Icon(Icons.person_add_alt_1),
+                            label: const Text('Add'),
+                          ),
+                        ],
+                      ),
+                    ],
                     if (_errorMessage != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
@@ -3332,28 +3407,42 @@ class _AdminStaffRosterDialogState extends State<AdminStaffRosterDialog> {
                                   subtitle: Text(
                                     '${member.hours} · ${member.isActive ? 'Active' : 'Inactive'}',
                                   ),
-                                  leading: Switch(
-                                    value: member.isActive,
-                                    onChanged: (value) =>
-                                        _setMemberActive(member, value),
-                                  ),
-                                  trailing: Wrap(
-                                    children: [
-                                      IconButton(
-                                        tooltip: 'Edit staff member',
-                                        onPressed: () => _editMember(member),
-                                        icon: const Icon(Icons.edit_outlined),
-                                      ),
-                                      IconButton(
-                                        tooltip: 'Remove staff member',
-                                        onPressed: () => _removeMember(member),
-                                        icon: const Icon(
-                                          Icons.delete_outline,
-                                          color: RamadaColors.danger,
+                                  leading: widget.readOnly
+                                      ? Icon(
+                                          member.isActive
+                                              ? Icons.check_circle_outline
+                                              : Icons.pause_circle_outline,
+                                          color: member.isActive
+                                              ? RamadaColors.success
+                                              : Colors.blueGrey,
+                                        )
+                                      : Switch(
+                                          value: member.isActive,
+                                          onChanged: (value) =>
+                                              _setMemberActive(member, value),
                                         ),
-                                      ),
-                                    ],
-                                  ),
+                                  trailing: widget.readOnly
+                                      ? null
+                                      : Wrap(
+                                          children: [
+                                            IconButton(
+                                              tooltip: 'Edit staff member',
+                                              onPressed: () =>
+                                                  _editMember(member),
+                                              icon: const Icon(
+                                                  Icons.edit_outlined),
+                                            ),
+                                            IconButton(
+                                              tooltip: 'Remove staff member',
+                                              onPressed: () =>
+                                                  _removeMember(member),
+                                              icon: const Icon(
+                                                Icons.delete_outline,
+                                                color: RamadaColors.danger,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                 );
                               },
                             ),
