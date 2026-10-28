@@ -581,7 +581,9 @@ class _AuthScreenState extends State<AuthScreen> {
                                 ),
                               ),
                       ),
-                      _buildLoginFooter(isWide: isWide),
+                      _buildLoginFooter(
+                        isWide: isWide && constraints.maxWidth >= 1200,
+                      ),
                     ],
                   );
                 },
@@ -597,63 +599,95 @@ class _AuthScreenState extends State<AuthScreen> {
         compact: compact,
       );
 
-  Widget _buildLoginFooter({required bool isWide}) => Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: const Color(0xFF071123).withValues(alpha: 0.82),
-          border: Border(
-            top: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
-          ),
+  Widget _buildLoginFooter({required bool isWide}) {
+    final brand = const Text(
+      '◈  Ramada by Wyndham  ·  Doha Old Town',
+      key: ValueKey('login-footer-brand'),
+      style: TextStyle(color: Color(0xFFD4DCE9), fontSize: 11),
+    );
+    final privacyButton = TextButton(
+      style: TextButton.styleFrom(
+        foregroundColor: const Color(0xFFD4DCE9),
+        minimumSize: const Size(44, 40),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        textStyle: const TextStyle(fontSize: 11),
+      ),
+      onPressed: () => _showLegalDialog(
+        title: 'Privacy Policy',
+        sections: _privacySections,
+      ),
+      child: const Text('Privacy Policy'),
+    );
+    final termsButton = TextButton(
+      style: TextButton.styleFrom(
+        foregroundColor: const Color(0xFFD4DCE9),
+        minimumSize: const Size(44, 40),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        textStyle: const TextStyle(fontSize: 11),
+      ),
+      onPressed: () => _showLegalDialog(
+        title: 'Terms & Conditions',
+        sections: _termsSections,
+      ),
+      child: const Text('Terms & Conditions'),
+    );
+    const poweredBy = Text(
+      'Powered by R & L Studio',
+      style: TextStyle(color: Color(0xFF9EABC0), fontSize: 10),
+    );
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFF071123).withValues(alpha: 0.82),
+        border: Border(
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
         ),
-        padding: EdgeInsets.symmetric(
-          horizontal: isWide ? 48 : 16,
-          vertical: isWide ? 8 : 4,
-        ),
-        child: Wrap(
-          alignment: isWide ? WrapAlignment.spaceBetween : WrapAlignment.center,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 6,
-          runSpacing: 0,
-          children: [
-            if (isWide)
-              const Text(
-                '◈  Ramada by Wyndham     ·     Doha Old Town',
-                style: TextStyle(color: Color(0xFFD4DCE9), fontSize: 11),
-              ),
-            TextButton(
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFFD4DCE9),
-                minimumSize: const Size(44, 44),
-                textStyle: const TextStyle(fontSize: 11),
-              ),
-              onPressed: () => _showLegalDialog(
-                title: 'Privacy Policy',
-                sections: _privacySections,
-              ),
-              child: const Text('Privacy Policy'),
+      ),
+      padding: EdgeInsets.symmetric(
+        horizontal: isWide ? 48 : 16,
+        vertical: isWide ? 6 : 8,
+      ),
+      child: isWide
+          ? Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                brand,
+                Row(
+                  key: const ValueKey('login-footer-links'),
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    privacyButton,
+                    const SizedBox(width: 8),
+                    termsButton,
+                    const SizedBox(width: 16),
+                    poweredBy,
+                  ],
+                ),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                brand,
+                const SizedBox(height: 4),
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 4,
+                  runSpacing: 0,
+                  children: [
+                    privacyButton,
+                    termsButton,
+                    poweredBy,
+                  ],
+                ),
+              ],
             ),
-            const Text('│', style: TextStyle(color: Colors.white38)),
-            TextButton(
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFFD4DCE9),
-                minimumSize: const Size(44, 44),
-                textStyle: const TextStyle(fontSize: 11),
-              ),
-              onPressed: () => _showLegalDialog(
-                title: 'Terms & Conditions',
-                sections: _termsSections,
-              ),
-              child: const Text('Terms & Conditions'),
-            ),
-            if (!isWide)
-              const Text('│', style: TextStyle(color: Colors.white38)),
-            const Text(
-              'Powered by R & L Studio',
-              style: TextStyle(color: Color(0xFF9EABC0), fontSize: 10),
-            ),
-          ],
-        ),
-      );
+    );
+  }
 
   static const _privacySections = <(String, String)>[
     (
@@ -2426,16 +2460,12 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
     final scopedEntries = _metricScopeEntries;
     final matchingEntries = switch (title) {
       'Handover Issued' => scopedEntries.where((item) {
-          final missing = item.isMissing
-              ? (item.missingQty > 0
-                  ? item.missingQty.clamp(0, item.remainingUnreturnedQty)
-                  : item.remainingUnreturnedQty)
-              : 0;
-          return item.remainingUnreturnedQty - missing > 0;
+          return item.remainingUnreturnedQty - item.missingQuantity > 0;
         }).toList(),
       'Return from Guest' =>
         scopedEntries.where((item) => item.qtyReturned > 0).toList(),
-      'Missing Keys' => scopedEntries.where((item) => item.isMissing).toList(),
+      'Missing Keys' =>
+        scopedEntries.where((item) => item.missingQuantity > 0).toList(),
       _ => scopedEntries,
     };
     final metricCount = switch (title) {
@@ -2479,7 +2509,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                       contentPadding: EdgeInsets.zero,
                       title: Text(item.roomOrAccess),
                       subtitle: Text(
-                        '${item.guestOrHolderName.isEmpty ? item.issuingStaff : item.guestOrHolderName} • Issued ${item.qtyIssued}, returned ${item.qtyReturned}${item.isMissing ? ' • Missing ${item.missingQty > 0 ? item.missingQty : item.remainingUnreturnedQty}' : ''}',
+                        '${item.guestOrHolderName.isEmpty ? item.issuingStaff : item.guestOrHolderName} • Issued ${item.qtyIssued}, returned ${item.qtyReturned}${item.missingQuantity > 0 ? ' • Missing ${item.missingQuantity}' : ''}',
                       ),
                     ),
               ],

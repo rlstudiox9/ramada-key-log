@@ -45,6 +45,11 @@ class KeyIssuanceItem {
   bool get isPending => !isFullyReturned && !isMissing;
   int get remainingUnreturnedQty =>
       isFullyReturned ? 0 : (qtyIssued - qtyReturned).clamp(0, 999);
+  int get missingQuantity => isMissing
+      ? (missingQty > 0
+          ? missingQty.clamp(0, remainingUnreturnedQty)
+          : remainingUnreturnedQty)
+      : 0;
 
   Map<String, dynamic> toMap() => {
         'id': id,
@@ -124,12 +129,8 @@ class KeyLogMetrics {
     var missing = 0;
     for (final entry in selectedEntries) {
       returned += entry.qtyReturned;
-      final unreturned = (entry.qtyIssued - entry.qtyReturned).clamp(0, 999);
-      final missingForEntry = entry.isMissing
-          ? (entry.missingQty > 0
-              ? entry.missingQty.clamp(0, unreturned)
-              : unreturned)
-          : 0;
+      final unreturned = entry.remainingUnreturnedQty;
+      final missingForEntry = entry.missingQuantity;
       missing += missingForEntry;
       handover += unreturned - missingForEntry;
     }
