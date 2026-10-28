@@ -1,0 +1,6 @@
+{
+  "name": "Ramada Keys",
+  "description": "Hotel Key Card & System Access Issuance Log for Ramada by Wyndham Doha Old Town with inventory metrics, shift logs, auto carry-forward, and CSV/JSON export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
