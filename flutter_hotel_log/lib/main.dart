@@ -11,6 +11,7 @@ import 'models/staff_roster_member.dart';
 import 'services/api_service.dart';
 import 'utils/file_download.dart';
 import 'utils/key_log_export.dart';
+import 'widgets/staff_performance_chart.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,17 +26,23 @@ class RamadaColors {
   static const Color gold = Color(0xFFC5A059);
   static const Color goldLight = Color(0xFFDFBA76);
   static const Color goldContainer = Color(0xFFF9F3E8);
-  static const Color charcoalDark = Color(0xFF141619);
-  static const Color charcoalSurface = Color(0xFF1E2126);
+  static const Color charcoalDark = Color(0xFF0B1020);
+  static const Color charcoalSurface = Color(0xFF111827);
+  static const Color charcoalRaised = Color(0xFF1A2436);
+  static const Color charcoalBorder = Color(0xFF28354A);
+  static const Color charcoalMuted = Color(0xFF9AA9BD);
   static const Color creamBg = Color(0xFFFBF9F5);
   static const Color white = Colors.white;
 
   // Status Colors
   static const Color success = Color(0xFF1B8755);
+  static const Color successText = Color(0xFF166534);
   static const Color successBg = Color(0xFFE8F5E9);
   static const Color warning = Color(0xFFD97706);
+  static const Color warningText = Color(0xFF92400E);
   static const Color warningBg = Color(0xFFFEF3C7);
   static const Color danger = Color(0xFFDC2626);
+  static const Color dangerText = Color(0xFFB91C1C);
   static const Color dangerBg = Color(0xFFFEE2E2);
   static const Color carried = Color(0xFF7C3AED);
   static const Color carriedBg = Color(0xFFF3E8FF);
@@ -143,7 +150,7 @@ class _RamadaKeyLogAppState extends State<RamadaKeyLogApp>
     with WidgetsBindingObserver {
   static const _idleLogoutDuration = Duration(minutes: 10);
 
-  ThemeMode _themeMode = ThemeMode.light;
+  ThemeMode _themeMode = ThemeMode.dark;
   late final ApiService _apiService;
   AuthSession? _session;
   bool _isRestoringSession = true;
@@ -339,6 +346,24 @@ class _RamadaKeyLogAppState extends State<RamadaKeyLogApp>
         useMaterial3: true,
         brightness: Brightness.light,
         scaffoldBackgroundColor: RamadaColors.creamBg,
+        dividerColor: const Color(0xFFE2E8F0),
+        textTheme: const TextTheme(
+          displayLarge: TextStyle(color: Color(0xFF1F2937)),
+          displayMedium: TextStyle(color: Color(0xFF1F2937)),
+          displaySmall: TextStyle(color: Color(0xFF1F2937)),
+          headlineLarge: TextStyle(color: Color(0xFF1F2937)),
+          headlineMedium: TextStyle(color: Color(0xFF1F2937)),
+          headlineSmall: TextStyle(color: Color(0xFF1F2937)),
+          titleLarge: TextStyle(color: Color(0xFF1F2937)),
+          titleMedium: TextStyle(color: Color(0xFF1F2937)),
+          titleSmall: TextStyle(color: Color(0xFF1F2937)),
+          bodyLarge: TextStyle(color: Color(0xFF1F2937)),
+          bodyMedium: TextStyle(color: Color(0xFF1F2937)),
+          bodySmall: TextStyle(color: Color(0xFF475569)),
+          labelLarge: TextStyle(color: Color(0xFF1F2937)),
+          labelMedium: TextStyle(color: Color(0xFF334155)),
+          labelSmall: TextStyle(color: Color(0xFF475569)),
+        ),
         cardTheme: const CardThemeData(
           color: Colors.white,
           surfaceTintColor: Colors.transparent,
@@ -354,16 +379,36 @@ class _RamadaKeyLogAppState extends State<RamadaKeyLogApp>
             color: RamadaColors.burgundyDark,
             fontWeight: FontWeight.bold,
           ),
-          dataTextStyle: TextStyle(color: Color(0xFF282828)),
+          dataTextStyle: TextStyle(color: Color(0xFF1F2937)),
         ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
         scaffoldBackgroundColor: RamadaColors.charcoalDark,
+        dividerColor: RamadaColors.charcoalBorder,
         cardTheme: const CardThemeData(
           color: RamadaColors.charcoalSurface,
           surfaceTintColor: Colors.transparent,
+          elevation: 0,
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: RamadaColors.charcoalRaised,
+          hintStyle: const TextStyle(color: RamadaColors.charcoalMuted),
+          labelStyle: const TextStyle(color: RamadaColors.charcoalMuted),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: RamadaColors.charcoalBorder),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: RamadaColors.charcoalBorder),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: RamadaColors.gold, width: 1.4),
+          ),
         ),
         colorScheme: ColorScheme.fromSeed(
           seedColor: RamadaColors.burgundy,
@@ -373,7 +418,7 @@ class _RamadaKeyLogAppState extends State<RamadaKeyLogApp>
           surface: RamadaColors.charcoalSurface,
         ),
         dataTableTheme: const DataTableThemeData(
-          headingRowColor: WidgetStatePropertyAll(Color(0xFF30343B)),
+          headingRowColor: WidgetStatePropertyAll(RamadaColors.charcoalRaised),
           headingTextStyle: TextStyle(
             color: RamadaColors.goldLight,
             fontWeight: FontWeight.bold,
@@ -1551,6 +1596,9 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
   String selectedShift = "Morning (07:00 - 15:00)";
   String searchQuery = "";
   String activeFilter = "ALL"; // ALL, PENDING, RETURNED, MISSING, CARRIED
+  final GlobalKey _overviewSectionKey = GlobalKey();
+  final GlobalKey _logsSectionKey = GlobalKey();
+  int _selectedDashboardSection = 0;
   bool _isLoading = true;
   String? _storageError;
   String? _inventorySyncError;
@@ -1906,6 +1954,11 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
   int get missingKeys => _metrics.missingKeys;
   int get currentlyWithGuest => _metrics.currentlyWithGuest;
   int get remainingInFd => _metrics.remainingInFd;
+  List<StaffIssueMetric> get _staffPerformanceMetrics =>
+      StaffPerformanceChart.calculateMetrics(
+        entries: issuances,
+        staffRoster: staffRoster,
+      );
 
   List<KeyIssuanceItem> get filteredList {
     return issuances.where((item) {
@@ -1967,7 +2020,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
         initialStaffName: dutyStaffName,
         staffRoster: staffRoster.where((staff) => staff.isActive).toList(),
         availableQuantity: remainingInFd,
-        onAdd: (room, guest, qty, cat, remarks, staff) async {
+        onAdd: (room, guest, qty, cat, remarks, staff, checkOutDate) async {
           final nowFmt =
               DateFormat('dd-MMM-yyyy hh:mm a').format(DateTime.now());
           final item = KeyIssuanceItem(
@@ -1976,6 +2029,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
             shiftDate: selectedDate,
             shiftPeriod: selectedShift,
             issuedDateTime: nowFmt,
+            checkOutDate: checkOutDate,
             issuingStaff: staff,
             roomOrAccess: room,
             guestOrHolderName: guest,
@@ -2340,6 +2394,251 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
     );
   }
 
+  void _navigateToDashboardSection(int section) {
+    setState(() => _selectedDashboardSection = section);
+    final targetContext =
+        (section == 0 ? _overviewSectionKey : _logsSectionKey).currentContext;
+    if (targetContext != null) {
+      unawaited(
+        Scrollable.ensureVisible(
+          targetContext,
+          duration: const Duration(milliseconds: 220),
+          alignment: 0.06,
+          curve: Curves.easeOutCubic,
+        ),
+      );
+    }
+  }
+
+  Widget _buildOperationsRail({required bool extended}) => Container(
+        width: extended ? 232 : 76,
+        decoration: const BoxDecoration(
+          color: RamadaColors.charcoalSurface,
+          border: Border(
+            right: BorderSide(color: RamadaColors.charcoalBorder),
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  extended ? 18 : 10,
+                  20,
+                  extended ? 18 : 10,
+                  20,
+                ),
+                child: Row(
+                  mainAxisAlignment: extended
+                      ? MainAxisAlignment.start
+                      : MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            RamadaColors.burgundy,
+                            RamadaColors.burgundyDark,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: RamadaColors.gold.withValues(alpha: 0.55),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.vpn_key_rounded,
+                        color: RamadaColors.goldLight,
+                        size: 20,
+                      ),
+                    ),
+                    if (extended) ...[
+                      const SizedBox(width: 11),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'RAMADA',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.1,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'KEY OPERATIONS',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: RamadaColors.charcoalMuted,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.7,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (extended)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 2, 16, 10),
+                  child: Row(
+                    children: [
+                      Text(
+                        'WORKSPACE',
+                        style: TextStyle(
+                          color: RamadaColors.charcoalMuted.withValues(
+                            alpha: 0.72,
+                          ),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.15,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(child: Divider(height: 1)),
+                    ],
+                  ),
+                ),
+              Expanded(
+                child: NavigationRail(
+                  backgroundColor: Colors.transparent,
+                  extended: extended,
+                  minWidth: 76,
+                  minExtendedWidth: 232,
+                  groupAlignment: -1,
+                  labelType: extended
+                      ? NavigationRailLabelType.none
+                      : NavigationRailLabelType.all,
+                  selectedIndex: _selectedDashboardSection,
+                  onDestinationSelected: _navigateToDashboardSection,
+                  indicatorColor: RamadaColors.burgundy.withValues(alpha: 0.35),
+                  selectedIconTheme: const IconThemeData(
+                    color: RamadaColors.goldLight,
+                    size: 20,
+                  ),
+                  unselectedIconTheme: const IconThemeData(
+                    color: RamadaColors.charcoalMuted,
+                    size: 19,
+                  ),
+                  indicatorShape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  selectedLabelTextStyle: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  unselectedLabelTextStyle: const TextStyle(
+                    color: RamadaColors.charcoalMuted,
+                    fontSize: 11,
+                  ),
+                  destinations: const [
+                    NavigationRailDestination(
+                      icon: Icon(Icons.space_dashboard_outlined),
+                      selectedIcon: Icon(Icons.space_dashboard_rounded),
+                      label: Text('Overview'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.vpn_key_outlined),
+                      selectedIcon: Icon(Icons.vpn_key_rounded),
+                      label: Text('Key log'),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  extended ? 14 : 8,
+                  10,
+                  extended ? 14 : 8,
+                  14,
+                ),
+                child: extended
+                    ? Container(
+                        padding: const EdgeInsets.all(11),
+                        decoration: BoxDecoration(
+                          color: RamadaColors.charcoalRaised,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: RamadaColors.charcoalBorder,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 17,
+                              backgroundColor:
+                                  RamadaColors.burgundy.withValues(alpha: 0.32),
+                              child: Text(
+                                widget.session.user.displayName.isEmpty
+                                    ? '?'
+                                    : widget.session.user.displayName[0]
+                                        .toUpperCase(),
+                                style: const TextStyle(
+                                  color: RamadaColors.goldLight,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    widget.session.user.displayName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    widget.session.user.roleLabel,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: RamadaColors.charcoalMuted,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : Tooltip(
+                        message: widget.session.user.displayName,
+                        child: const Icon(
+                          Icons.account_circle_outlined,
+                          color: RamadaColors.charcoalMuted,
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -2349,16 +2648,29 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
 
     return Scaffold(
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(70),
+        preferredSize: const Size.fromHeight(68),
         child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [RamadaColors.burgundyDark, RamadaColors.burgundy],
+          decoration: BoxDecoration(
+            color:
+                isDark ? RamadaColors.charcoalSurface : RamadaColors.burgundy,
+            border: Border(
+              bottom: BorderSide(
+                color: isDark
+                    ? RamadaColors.charcoalBorder
+                    : RamadaColors.burgundyLight,
+              ),
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.18 : 0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final compact = constraints.maxWidth < 1000;
@@ -2368,13 +2680,21 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                         child: Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.all(9),
                               decoration: BoxDecoration(
-                                color: RamadaColors.gold.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(10),
+                                color:
+                                    RamadaColors.gold.withValues(alpha: 0.14),
+                                borderRadius: BorderRadius.circular(11),
+                                border: Border.all(
+                                  color:
+                                      RamadaColors.gold.withValues(alpha: 0.2),
+                                ),
                               ),
-                              child: const Icon(Icons.key,
-                                  color: RamadaColors.goldLight, size: 28),
+                              child: const Icon(
+                                Icons.vpn_key_rounded,
+                                color: RamadaColors.goldLight,
+                                size: 24,
+                              ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -2382,14 +2702,14 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text(
+                                  const Text(
                                     'RAMADA BY WYNDHAM',
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w900,
-                                      letterSpacing: 2,
-                                      fontSize: 16,
+                                      letterSpacing: 1.6,
+                                      fontSize: 14,
                                     ),
                                   ),
                                   Text(
@@ -2397,7 +2717,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                                         ? '${widget.session.user.displayName} • ${widget.session.user.roleLabel}'
                                         : 'DOHA OLD TOWN • KEY CARD & ACCESS LOG',
                                     overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       color: RamadaColors.goldLight,
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
@@ -2507,148 +2827,429 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_storageError != null || _inventorySyncError != null)
-              MaterialBanner(
-                content: Text(_storageError ?? _inventorySyncError!),
-                leading: const Icon(Icons.warning_amber),
-                actions: [
-                  TextButton(
-                    onPressed: () async {
-                      try {
-                        await _refreshLogs();
-                        await _refreshSharedInventory();
-                      } catch (error, stackTrace) {
-                        _reportApiError(error, stackTrace);
-                      }
-                    },
-                    child: const Text('Retry Connection'),
-                  ),
-                ],
+      body: Row(
+        children: [
+          if (MediaQuery.sizeOf(context).width >= 1080)
+            _buildOperationsRail(
+              extended: MediaQuery.sizeOf(context).width >= 1320,
+            ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                MediaQuery.sizeOf(context).width < 700 ? 12 : 26,
+                MediaQuery.sizeOf(context).width < 700 ? 12 : 26,
+                MediaQuery.sizeOf(context).width < 700 ? 12 : 26,
+                110,
               ),
-            // Metrics Dashboard Box
-            _buildInventoryMetricsBox(),
-            const SizedBox(height: 16),
-
-            // Shift Engine Banner
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color:
-                    isDark ? const Color(0xFF302641) : RamadaColors.carriedBg,
-                borderRadius: BorderRadius.circular(10),
-                border:
-                    Border.all(color: RamadaColors.carried.withOpacity(0.55)),
-              ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.sync,
-                    color:
-                        isDark ? const Color(0xFFC6A7FF) : RamadaColors.carried,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Daily Shift & Auto Carry-Forward Engine: Unreturned keys automatically carried forward from previous 24h shifts.',
-                      style: TextStyle(
-                          color: isDark
-                              ? const Color(0xFFE0D4F5)
-                              : RamadaColors.carried,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Operations overview',
+                                style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white
+                                      : RamadaColors.charcoalDark,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                'Front desk key inventory and shift activity',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: isDark
+                                      ? RamadaColors.charcoalMuted
+                                      : const Color(0xFF526174),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 11,
+                            vertical: 9,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? RamadaColors.charcoalSurface
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isDark
+                                  ? RamadaColors.charcoalBorder
+                                  : const Color(0xFFD8DEE8),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.calendar_today_rounded,
+                                size: 14,
+                                color: isDark
+                                    ? RamadaColors.goldLight
+                                    : RamadaColors.burgundy,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                DateFormat('EEE, d MMM').format(DateTime.now()),
+                                style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white
+                                      : RamadaColors.charcoalDark,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: RamadaColors.carried,
-                        foregroundColor: Colors.white),
-                    onPressed: _triggerAutoCarryForward,
-                    child: const Text('Sync Engine'),
+                  if (_storageError != null || _inventorySyncError != null)
+                    MaterialBanner(
+                      content: Text(_storageError ?? _inventorySyncError!),
+                      leading: const Icon(Icons.warning_amber),
+                      actions: [
+                        TextButton(
+                          onPressed: () async {
+                            try {
+                              await _refreshLogs();
+                              await _refreshSharedInventory();
+                            } catch (error, stackTrace) {
+                              _reportApiError(error, stackTrace);
+                            }
+                          },
+                          child: const Text('Retry Connection'),
+                        ),
+                      ],
+                    ),
+                  // Metrics Dashboard Box
+                  KeyedSubtree(
+                    key: _overviewSectionKey,
+                    child: _buildInventoryMetricsBox(),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
+                  const SizedBox(height: 16),
+                  StaffPerformanceChart(metrics: _staffPerformanceMetrics),
+                  const SizedBox(height: 16),
 
-            // Filters & Search
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final searchField = TextField(
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.search),
-                    hintText: 'Search Room No (e.g. 405), Staff, Guest...',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
-                  onChanged: (v) => setState(() => searchQuery = v),
-                );
-                final shiftSelector = SizedBox(
-                  width: constraints.maxWidth < 680 ? double.infinity : 270,
-                  child: Tooltip(
-                    message: 'Select your duty shift',
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Duty Shift',
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                        border: OutlineInputBorder(),
+                  // Shift Engine Banner
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? RamadaColors.charcoalSurface
+                          : RamadaColors.goldContainer,
+                      borderRadius: BorderRadius.circular(13),
+                      border: Border.all(
+                        color: isDark
+                            ? RamadaColors.charcoalBorder
+                            : RamadaColors.gold.withValues(alpha: 0.3),
                       ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          key: const ValueKey('dashboard:duty-shift'),
-                          value: selectedShift,
-                          isExpanded: true,
-                          items: shifts
-                              .where((shift) =>
-                                  widget.session.user.isAdmin ||
-                                  shift != 'All Shifts')
-                              .map((s) =>
-                                  DropdownMenuItem(value: s, child: Text(s)))
-                              .toList(),
-                          onChanged: (value) {
-                            if (value != null) unawaited(_selectShift(value));
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.sync,
+                          color: isDark
+                              ? RamadaColors.goldLight
+                              : RamadaColors.burgundy,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Shift automation',
+                                style: TextStyle(
+                                  color: isDark
+                                      ? Colors.white
+                                      : RamadaColors.burgundyDark,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Unreturned keys carry forward at shift handover.',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: isDark
+                                      ? RamadaColors.charcoalMuted
+                                      : Colors.blueGrey,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        FilledButton.tonal(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: RamadaColors.burgundy.withValues(
+                              alpha: isDark ? 0.25 : 0.1,
+                            ),
+                            foregroundColor: isDark
+                                ? RamadaColors.goldLight
+                                : RamadaColors.burgundy,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          onPressed: _triggerAutoCarryForward,
+                          child: const Text('Sync'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  KeyedSubtree(
+                    key: _logsSectionKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            top: 4,
+                            bottom: 14,
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Key log',
+                                      style: TextStyle(
+                                        color: isDark
+                                            ? Colors.white
+                                            : RamadaColors.charcoalDark,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      'Search and manage issued key cards',
+                                      style: TextStyle(
+                                        color: isDark
+                                            ? RamadaColors.charcoalMuted
+                                            : const Color(0xFF526174),
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? RamadaColors.charcoalRaised
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: isDark
+                                        ? RamadaColors.charcoalBorder
+                                        : const Color(0xFFD8DEE8),
+                                  ),
+                                ),
+                                child: Text(
+                                  '${filteredList.length} entries',
+                                  style: TextStyle(
+                                    color: isDark
+                                        ? RamadaColors.charcoalMuted
+                                        : const Color(0xFF526174),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Filters & Search
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final searchField = TextField(
+                              decoration: InputDecoration(
+                                filled: true,
+                                fillColor: isDark
+                                    ? RamadaColors.charcoalRaised
+                                    : Colors.white,
+                                prefixIcon: Icon(
+                                  Icons.search,
+                                  color: isDark
+                                      ? RamadaColors.charcoalMuted
+                                      : const Color(0xFF526174),
+                                ),
+                                hintText: 'Search room, guest or staff',
+                                hintStyle: TextStyle(
+                                  color: isDark
+                                      ? RamadaColors.charcoalMuted
+                                      : const Color(0xFF64748B),
+                                  fontSize: 12,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(11),
+                                  borderSide: BorderSide(
+                                    color: isDark
+                                        ? RamadaColors.charcoalBorder
+                                        : RamadaColors.burgundy
+                                            .withValues(alpha: 0.18),
+                                  ),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 12,
+                                ),
+                              ),
+                              onChanged: (v) => setState(() => searchQuery = v),
+                            );
+                            final shiftSelector = SizedBox(
+                              width: constraints.maxWidth < 680
+                                  ? double.infinity
+                                  : 270,
+                              child: Tooltip(
+                                message: 'Select your duty shift',
+                                child: InputDecorator(
+                                  decoration: InputDecoration(
+                                    labelText: 'Duty Shift',
+                                    labelStyle: TextStyle(
+                                      color: isDark
+                                          ? RamadaColors.charcoalMuted
+                                          : const Color(0xFF526174),
+                                      fontSize: 11,
+                                    ),
+                                    filled: true,
+                                    fillColor: isDark
+                                        ? RamadaColors.charcoalRaised
+                                        : Colors.white,
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(11),
+                                      borderSide: BorderSide(
+                                        color: isDark
+                                            ? RamadaColors.charcoalBorder
+                                            : const Color(0xFFD8DEE8),
+                                      ),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 4,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(11),
+                                      borderSide: BorderSide(
+                                        color: isDark
+                                            ? RamadaColors.charcoalBorder
+                                            : RamadaColors.burgundy
+                                                .withValues(alpha: 0.18),
+                                      ),
+                                    ),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      key: const ValueKey(
+                                          'dashboard:duty-shift'),
+                                      value: selectedShift,
+                                      isExpanded: true,
+                                      items: shifts
+                                          .where((shift) =>
+                                              widget.session.user.isAdmin ||
+                                              shift != 'All Shifts')
+                                          .map((s) => DropdownMenuItem(
+                                              value: s, child: Text(s)))
+                                          .toList(),
+                                      onChanged: (value) {
+                                        if (value != null) {
+                                          unawaited(_selectShift(value));
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                            if (constraints.maxWidth < 680) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  searchField,
+                                  const SizedBox(height: 12),
+                                  shiftSelector,
+                                ],
+                              );
+                            }
+                            return Row(
+                              children: [
+                                Expanded(child: searchField),
+                                const SizedBox(width: 12),
+                                shiftSelector,
+                              ],
+                            );
                           },
                         ),
-                      ),
+                        const SizedBox(height: 12),
+
+                        // Table of records
+                        _buildIssuanceTable(),
+                      ],
                     ),
                   ),
-                );
-                if (constraints.maxWidth < 680) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      searchField,
-                      const SizedBox(height: 12),
-                      shiftSelector,
-                    ],
-                  );
-                }
-                return Row(
-                  children: [
-                    Expanded(child: searchField),
-                    const SizedBox(width: 12),
-                    shiftSelector,
-                  ],
-                );
-              },
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
-
-            // Table of records
-            _buildIssuanceTable(),
-          ],
-        ),
+          ),
+        ],
       ),
+      bottomNavigationBar: MediaQuery.sizeOf(context).width < 1080
+          ? NavigationBar(
+              height: 64,
+              backgroundColor: RamadaColors.charcoalSurface,
+              indicatorColor: RamadaColors.burgundy.withValues(alpha: 0.35),
+              selectedIndex: _selectedDashboardSection,
+              onDestinationSelected: _navigateToDashboardSection,
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.space_dashboard_outlined),
+                  selectedIcon: Icon(Icons.space_dashboard_rounded),
+                  label: 'Overview',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.vpn_key_outlined),
+                  selectedIcon: Icon(Icons.vpn_key_rounded),
+                  label: 'Key log',
+                ),
+              ],
+            )
+          : null,
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: RamadaColors.burgundy,
-        foregroundColor: Colors.white,
+        backgroundColor: RamadaColors.gold,
+        foregroundColor: RamadaColors.charcoalDark,
+        elevation: 1,
+        hoverElevation: 3,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         onPressed: _openAddDialog,
         icon: const Icon(Icons.add),
         label: const Text('Issue Key Card',
@@ -2660,27 +3261,38 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
   Widget _buildInventoryMetricsBox() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final healthyColor =
-        isDark ? const Color(0xFF7BE0A6) : RamadaColors.success;
+        isDark ? const Color(0xFF7BE0A6) : RamadaColors.successText;
     final criticalColor =
-        isDark ? const Color(0xFFFF9A9A) : RamadaColors.danger;
+        isDark ? const Color(0xFFFF9A9A) : RamadaColors.dangerText;
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: isDark
+              ? RamadaColors.charcoalBorder
+              : RamadaColors.burgundy.withValues(alpha: 0.12),
+        ),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'REAL-TIME FRONT DESK INVENTORY METRICS',
+                    'KEY INVENTORY',
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      letterSpacing: 1,
+                      color: isDark
+                          ? RamadaColors.charcoalMuted
+                          : const Color(0xFF475569),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 10,
+                      letterSpacing: 1.15,
                     ),
                   ),
                 ),
@@ -2705,67 +3317,91 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                         : (isDark
                             ? const Color(0xFF4A2528)
                             : RamadaColors.dangerBg),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: remainingInFd >= 20
+                          ? healthyColor.withValues(alpha: 0.28)
+                          : criticalColor.withValues(alpha: 0.28),
+                    ),
                   ),
                   child: Text(
                     remainingInFd >= 20 ? 'Stock Healthy' : 'Stock Critical',
                     style: TextStyle(
                       color: remainingInFd >= 20 ? healthyColor : criticalColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 10,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                _buildMetricTile(
-                    'Total Keys',
-                    '$totalInventory Pcs',
-                    Icons.inventory,
-                    RamadaColors.burgundy,
-                    isDark
-                        ? const Color(0xFF39252B)
-                        : RamadaColors.burgundy.withOpacity(0.08),
-                    onTap: () => _openMetricSummary('Total Keys')),
-                _buildMetricTile(
-                    'Handover Issued',
-                    '$handoverToGuest Keys',
-                    Icons.arrow_forward,
-                    Colors.blue,
-                    isDark
-                        ? const Color(0xFF1E3447)
-                        : Colors.blue.withOpacity(0.1),
-                    onTap: () => _openMetricSummary('Handover Issued')),
-                _buildMetricTile(
-                    'Return from Guest',
-                    '$returnFromGuest Returned',
-                    Icons.undo,
-                    RamadaColors.success,
-                    isDark ? const Color(0xFF173E2C) : RamadaColors.successBg,
-                    onTap: () => _openMetricSummary('Return from Guest')),
-                _buildMetricTile(
-                    'Missing Keys',
-                    '$missingKeys Pcs',
-                    Icons.warning,
-                    isDark ? const Color(0xFFFF9A9A) : RamadaColors.danger,
-                    isDark ? const Color(0xFF4A2528) : RamadaColors.dangerBg,
-                    onTap: () => _openMetricSummary('Missing Keys')),
-                _buildMetricTile(
-                    'Remaining in FD',
-                    '$remainingInFd Available',
-                    Icons.check_circle,
-                    isDark ? RamadaColors.goldLight : RamadaColors.gold,
-                    isDark
-                        ? const Color(0xFF3D3522)
-                        : RamadaColors.goldContainer,
-                    isHighlighted: true,
-                    onTap: () => _openMetricSummary('Remaining in FD')),
-              ],
+            const SizedBox(height: 14),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = constraints.maxWidth >= 1120
+                    ? 5
+                    : constraints.maxWidth >= 740
+                        ? 3
+                        : constraints.maxWidth >= 440
+                            ? 2
+                            : 1;
+                const spacing = 10.0;
+                final width =
+                    (constraints.maxWidth - spacing * (columns - 1)) / columns;
+                final tiles = <Widget Function(double)>[
+                  (width) => _buildMetricTile(
+                        'Total Keys',
+                        '$totalInventory Pcs',
+                        Icons.inventory_2_outlined,
+                        const Color(0xFFD57972),
+                        const Color(0xFF302426),
+                        width: width,
+                        onTap: () => _openMetricSummary('Total Keys'),
+                      ),
+                  (width) => _buildMetricTile(
+                        'Handover Issued',
+                        '$handoverToGuest Keys',
+                        Icons.north_east_rounded,
+                        const Color(0xFF6FB0D2),
+                        const Color(0xFF202C34),
+                        width: width,
+                        onTap: () => _openMetricSummary('Handover Issued'),
+                      ),
+                  (width) => _buildMetricTile(
+                        'Return from Guest',
+                        '$returnFromGuest Returned',
+                        Icons.keyboard_return_rounded,
+                        const Color(0xFF6DC69A),
+                        const Color(0xFF202E29),
+                        width: width,
+                        onTap: () => _openMetricSummary('Return from Guest'),
+                      ),
+                  (width) => _buildMetricTile(
+                        'Missing',
+                        '$missingKeys Pcs',
+                        Icons.warning_amber_rounded,
+                        const Color(0xFFE58179),
+                        const Color(0xFF322523),
+                        width: width,
+                        onTap: () => _openMetricSummary('Missing Keys'),
+                      ),
+                  (width) => _buildMetricTile(
+                        'Available at Desk',
+                        '$remainingInFd Available',
+                        Icons.desk_outlined,
+                        RamadaColors.goldLight,
+                        const Color(0xFF302C22),
+                        isHighlighted: true,
+                        width: width,
+                        onTap: () => _openMetricSummary('Remaining in FD'),
+                      ),
+                ];
+                return Wrap(
+                  spacing: spacing,
+                  runSpacing: spacing,
+                  children: [for (final tile in tiles) tile(width)],
+                );
+              },
             ),
           ],
         ),
@@ -2775,31 +3411,43 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
 
   Widget _buildMetricTile(
       String title, String val, IconData icon, Color color, Color bg,
-      {bool isHighlighted = false, VoidCallback? onTap}) {
+      {bool isHighlighted = false, double width = 170, VoidCallback? onTap}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final tileColor = isDark ? Color.lerp(color, Colors.white, 0.55)! : color;
-    final tileBackground =
-        isDark ? Color.lerp(bg, RamadaColors.charcoalSurface, 0.72)! : bg;
+    final tileColor =
+        isDark ? color : Color.lerp(color, RamadaColors.charcoalDark, 0.42)!;
+    final tileBackground = isDark ? bg : Color.lerp(bg, Colors.white, 0.72)!;
     return SizedBox(
-      width: 170,
+      width: width,
+      height: 116,
       child: Material(
         color: tileBackground,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(13),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(13),
           child: Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              border:
-                  isHighlighted ? Border.all(color: tileColor, width: 2) : null,
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(
+                color: isHighlighted
+                    ? RamadaColors.gold.withValues(alpha: 0.42)
+                    : (isDark
+                        ? Colors.white.withValues(alpha: 0.055)
+                        : color.withValues(alpha: 0.14)),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.12 : 0.04),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
                       child: Text(
@@ -2807,22 +3455,52 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: tileColor,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? RamadaColors.charcoalMuted
+                              : const Color(0xFF475569),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
-                    Icon(icon, color: tileColor, size: 16),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: tileColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: Icon(icon, color: tileColor, size: 17),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 6),
+                const Spacer(),
                 Text(
                   val,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: tileColor,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
+                    color: isDark ? Colors.white : RamadaColors.charcoalDark,
+                    fontSize: 22,
+                    height: 1.1,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'View details  ›',
+                  style: TextStyle(
+                    color: isHighlighted
+                        ? (isDark
+                            ? RamadaColors.goldLight
+                            : RamadaColors.burgundy)
+                        : (isDark
+                            ? RamadaColors.charcoalMuted
+                            : const Color(0xFF526174)),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -2914,15 +3592,36 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
   Widget _buildIssuanceTable() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      clipBehavior: Clip.antiAlias,
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+          color: isDark
+              ? RamadaColors.charcoalBorder
+              : RamadaColors.burgundy.withValues(alpha: 0.12),
+        ),
+      ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
+          headingRowHeight: 48,
+          dataRowMinHeight: 52,
+          dataRowMaxHeight: 60,
+          horizontalMargin: 18,
+          columnSpacing: 22,
+          dividerThickness: 0.6,
+          dataRowColor: WidgetStateProperty.resolveWith((states) =>
+              states.contains(WidgetState.hovered)
+                  ? (isDark
+                      ? RamadaColors.charcoalRaised.withValues(alpha: 0.72)
+                      : RamadaColors.goldContainer)
+                  : null),
           headingRowColor: WidgetStateProperty.all(
             isDark
-                ? const Color(0xFF30343B)
-                : RamadaColors.burgundy.withOpacity(0.08),
+                ? RamadaColors.charcoalRaised
+                : RamadaColors.burgundy.withValues(alpha: 0.08),
           ),
           columns: const [
             DataColumn(
@@ -2962,13 +3661,25 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
           rows: filteredList.asMap().entries.map((entry) {
             final item = entry.value;
             final rowNumber = entry.key + 1;
+            final hasScheduledCheckout =
+                item.isPending && item.checkOutDate != null;
+            final parsedCheckoutDate = item.checkOutDate == null
+                ? null
+                : DateTime.tryParse(item.checkOutDate!);
+            final checkoutLabel = parsedCheckoutDate == null
+                ? item.checkOutDate
+                : DateFormat('d MMM yyyy').format(parsedCheckoutDate);
             final statusColor = item.isMissing
-                ? (isDark ? const Color(0xFFFF9A9A) : RamadaColors.danger)
+                ? (isDark
+                    ? const Color(0xFFFF9A9A)
+                    : RamadaColors.dangerText)
                 : (item.isFullyReturned
-                    ? (isDark ? const Color(0xFF7BE0A6) : RamadaColors.success)
+                    ? (isDark
+                        ? const Color(0xFF7BE0A6)
+                        : RamadaColors.successText)
                     : (isDark
                         ? const Color(0xFFFFD180)
-                        : RamadaColors.warning));
+                        : RamadaColors.warningText));
             final statusBackground = item.isMissing
                 ? (isDark ? const Color(0xFF4A2528) : RamadaColors.dangerBg)
                 : (item.isFullyReturned
@@ -2996,20 +3707,37 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                 DataCell(
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
                       color: statusBackground,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      item.isMissing
-                          ? 'MISSING'
-                          : (item.isFullyReturned ? 'RETURNED' : 'PENDING'),
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: statusColor,
+                      borderRadius: BorderRadius.circular(5),
+                      border: Border.all(
+                        color: statusColor.withValues(alpha: 0.2),
                       ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          item.isMissing
+                              ? 'MISSING'
+                              : (item.isFullyReturned ? 'RETURNED' : 'PENDING'),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: statusColor,
+                          ),
+                        ),
+                        if (hasScheduledCheckout)
+                          Text(
+                            'Check-out $checkoutLabel',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: statusColor,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -3029,7 +3757,9 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                       if (item.isPending)
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                              backgroundColor: RamadaColors.success,
+                              backgroundColor: isDark
+                                  ? RamadaColors.success
+                                  : RamadaColors.successText,
                               foregroundColor: Colors.white,
                               padding:
                                   const EdgeInsets.symmetric(horizontal: 8)),
@@ -3064,6 +3794,7 @@ class AddIssuanceDialog extends StatefulWidget {
     String cat,
     String remarks,
     String staff,
+    String? checkOutDate,
   ) onAdd;
   final String initialStaffName;
   final int availableQuantity;
@@ -3875,6 +4606,7 @@ class _AddIssuanceDialogState extends State<AddIssuanceDialog> {
   String category = "Guest Key Card";
   String remarks = "";
   String? staffName;
+  DateTime? checkOutDate;
   bool _isSubmitting = false;
 
   @override
@@ -3885,6 +4617,21 @@ class _AddIssuanceDialogState extends State<AddIssuanceDialog> {
     )
         ? widget.initialStaffName
         : null;
+  }
+
+  Future<void> _selectCheckOutDate() async {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final lastDate = DateTime(today.year + 10, today.month, today.day);
+    final initialDate = checkOutDate ?? today.add(const Duration(days: 1));
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: initialDate.isBefore(today) ? today : initialDate,
+      firstDate: today,
+      lastDate: lastDate,
+    );
+    if (selectedDate != null && mounted) {
+      setState(() => checkOutDate = DateUtils.dateOnly(selectedDate));
+    }
   }
 
   @override
@@ -3913,6 +4660,42 @@ class _AddIssuanceDialogState extends State<AddIssuanceDialog> {
                 decoration:
                     const InputDecoration(labelText: 'Guest / Holder Name'),
                 onChanged: (value) => guest = value,
+              ),
+              const SizedBox(height: 8),
+              InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Expected check-out date (optional)',
+                  suffixIcon: Icon(Icons.calendar_today_outlined),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        checkOutDate == null
+                            ? 'No check-out date'
+                            : DateFormat('d MMM yyyy').format(checkOutDate!),
+                      ),
+                    ),
+                    TextButton(
+                      key: const ValueKey('issue:check-out-date'),
+                      onPressed: _selectCheckOutDate,
+                      child: Text(checkOutDate == null ? 'Set date' : 'Change'),
+                    ),
+                    if (checkOutDate != null)
+                      IconButton(
+                        tooltip: 'Clear check-out date',
+                        onPressed: () => setState(() => checkOutDate = null),
+                        icon: const Icon(Icons.clear),
+                      ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'Keys stay active through the check-out date. Without one, unreturned keys are marked missing after 24 hours.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ),
               DropdownButtonFormField<String>(
                 key: const ValueKey('issue:staff-name'),
@@ -3987,6 +4770,9 @@ class _AddIssuanceDialogState extends State<AddIssuanceDialog> {
                       category,
                       remarks,
                       selectedStaff,
+                      checkOutDate == null
+                          ? null
+                          : DateFormat('yyyy-MM-dd').format(checkOutDate!),
                     );
                     if (dialogContext.mounted) {
                       Navigator.pop(dialogContext);

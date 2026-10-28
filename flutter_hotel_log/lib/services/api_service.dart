@@ -526,6 +526,7 @@ class ApiService {
 
   static Map<String, dynamic> _toApiPayload(KeyIssuanceItem item) => {
         'issued_date': item.issuedDateTime,
+        'check_out_date': item.checkOutDate,
         'staff_name': item.issuingStaff,
         'room_no': item.roomOrAccess,
         'qty_issue': item.qtyIssued,
@@ -574,6 +575,7 @@ class ApiService {
           ? shiftPeriod!
           : _shiftFromDate(parsedDate),
       issuedDateTime: issueDate,
+      checkOutDate: _asNullableString(data['check_out_date']),
       issuingStaff: data['staff_name']?.toString() ?? '',
       roomOrAccess: data['room_no']?.toString() ?? '',
       guestOrHolderName: data['guest_or_holder_name']?.toString() ?? '',

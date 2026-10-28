@@ -4,6 +4,7 @@ class KeyIssuanceItem {
   String shiftDate;
   String shiftPeriod;
   final String issuedDateTime;
+  String? checkOutDate;
   String issuingStaff;
   String roomOrAccess;
   String guestOrHolderName;
@@ -25,6 +26,7 @@ class KeyIssuanceItem {
     required this.shiftDate,
     required this.shiftPeriod,
     required this.issuedDateTime,
+    this.checkOutDate,
     required this.issuingStaff,
     required this.roomOrAccess,
     this.guestOrHolderName = '',
@@ -57,6 +59,7 @@ class KeyIssuanceItem {
         'shiftDate': shiftDate,
         'shiftPeriod': shiftPeriod,
         'issuedDateTime': issuedDateTime,
+        'checkOutDate': checkOutDate,
         'issuingStaff': issuingStaff,
         'roomOrAccess': roomOrAccess,
         'guestOrHolderName': guestOrHolderName,
@@ -79,6 +82,7 @@ class KeyIssuanceItem {
         shiftDate: map['shiftDate'] as String,
         shiftPeriod: map['shiftPeriod'] as String,
         issuedDateTime: map['issuedDateTime'] as String,
+        checkOutDate: map['checkOutDate'] as String?,
         issuingStaff: map['issuingStaff'] as String,
         roomOrAccess: map['roomOrAccess'] as String,
         guestOrHolderName: map['guestOrHolderName'] as String? ?? '',
@@ -207,10 +211,11 @@ class KeyLogLogic {
           sNo: entries.length + 1,
           shiftDate: shiftDate,
           shiftPeriod: shiftPeriod,
-          issuedDateTime: issuedDateTime,
+          issuedDateTime: entry.issuedDateTime,
           issuingStaff: issuingStaff,
           roomOrAccess: entry.roomOrAccess,
           guestOrHolderName: entry.guestOrHolderName,
+          checkOutDate: entry.checkOutDate,
           qtyIssued: entry.remainingUnreturnedQty,
           isCarriedForward: true,
           originalShiftDate: entry.originalShiftDate ?? entry.shiftDate,
