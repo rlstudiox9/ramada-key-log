@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'models/auth_session.dart';
@@ -15,6 +16,7 @@ import 'widgets/staff_performance_chart.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  usePathUrlStrategy();
   runApp(const RamadaKeyLogApp());
 }
 
@@ -2839,7 +2841,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                 MediaQuery.sizeOf(context).width < 700 ? 12 : 26,
                 MediaQuery.sizeOf(context).width < 700 ? 12 : 26,
                 MediaQuery.sizeOf(context).width < 700 ? 12 : 26,
-                110,
+                160,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -3603,184 +3605,266 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
               : RamadaColors.burgundy.withValues(alpha: 0.12),
         ),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          headingRowHeight: 48,
-          dataRowMinHeight: 52,
-          dataRowMaxHeight: 60,
-          horizontalMargin: 18,
-          columnSpacing: 22,
-          dividerThickness: 0.6,
-          dataRowColor: WidgetStateProperty.resolveWith((states) =>
-              states.contains(WidgetState.hovered)
-                  ? (isDark
-                      ? RamadaColors.charcoalRaised.withValues(alpha: 0.72)
-                      : RamadaColors.goldContainer)
-                  : null),
-          headingRowColor: WidgetStateProperty.all(
-            isDark
-                ? RamadaColors.charcoalRaised
-                : RamadaColors.burgundy.withValues(alpha: 0.08),
-          ),
-          columns: const [
-            DataColumn(
-                label: Text('S.No',
-                    style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(
-                label: Text('Issued Time',
-                    style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(
-                label: Text('Staff',
-                    style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(
-                label: Text('Room / Access',
-                    style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(
-                label: Text('Qty Issue',
-                    style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(
-                label: Text('Qty Ret',
-                    style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(
-                label: Text('Status',
-                    style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(
-                label: Text('Returned Time',
-                    style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(
-                label: Text('Key Received By',
-                    style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(
-                label: Text('Remarks',
-                    style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(
-                label: Text('Actions',
-                    style: TextStyle(fontWeight: FontWeight.bold))),
-          ],
-          rows: filteredList.asMap().entries.map((entry) {
-            final item = entry.value;
-            final rowNumber = entry.key + 1;
-            final hasScheduledCheckout =
-                item.isPending && item.checkOutDate != null;
-            final parsedCheckoutDate = item.checkOutDate == null
-                ? null
-                : DateTime.tryParse(item.checkOutDate!);
-            final checkoutLabel = parsedCheckoutDate == null
-                ? item.checkOutDate
-                : DateFormat('d MMM yyyy').format(parsedCheckoutDate);
-            final statusColor = item.isMissing
-                ? (isDark
-                    ? const Color(0xFFFF9A9A)
-                    : RamadaColors.dangerText)
-                : (item.isFullyReturned
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 1080;
+          final horizontalMargin = compact ? 6.0 : 8.0;
+          final columnSpacing = compact ? 4.0 : 7.0;
+          final availableColumnWidth = (constraints.maxWidth -
+                  horizontalMargin * 2 -
+                  columnSpacing * 10 -
+                  24)
+              .clamp(0.0, double.infinity);
+          const columnWeights = [
+            0.040,
+            0.098,
+            0.078,
+            0.088,
+            0.053,
+            0.053,
+            0.103,
+            0.098,
+            0.088,
+            0.107,
+            0.194,
+          ];
+          final columnWidths = columnWeights
+              .map((weight) => availableColumnWidth * weight)
+              .toList(growable: false);
+
+          Widget heading(int column, String label) => SizedBox(
+                width: columnWidths[column],
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              );
+
+          Widget cellText(
+            int column,
+            String value, {
+            TextStyle? style,
+            int maxLines = 2,
+          }) =>
+              SizedBox(
+                width: columnWidths[column],
+                child: Text(
+                  value,
+                  maxLines: maxLines,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
+                  style: style,
+                ),
+              );
+
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              headingRowHeight: compact ? 52 : 48,
+              dataRowMinHeight: compact ? 56 : 52,
+              dataRowMaxHeight: compact ? 76 : 64,
+              horizontalMargin: horizontalMargin,
+              columnSpacing: columnSpacing,
+              dividerThickness: 0.6,
+              dataRowColor: WidgetStateProperty.resolveWith((states) =>
+                  states.contains(WidgetState.hovered)
+                      ? (isDark
+                          ? RamadaColors.charcoalRaised.withValues(alpha: 0.72)
+                          : RamadaColors.goldContainer)
+                      : null),
+              headingRowColor: WidgetStateProperty.all(
+                isDark
+                    ? RamadaColors.charcoalRaised
+                    : RamadaColors.burgundy.withValues(alpha: 0.08),
+              ),
+              columns: [
+                DataColumn(label: heading(0, 'S.No')),
+                DataColumn(label: heading(1, 'Issued Time')),
+                DataColumn(label: heading(2, 'Staff')),
+                DataColumn(label: heading(3, 'Room / Access')),
+                DataColumn(label: heading(4, 'Qty Issue')),
+                DataColumn(label: heading(5, 'Qty Ret')),
+                DataColumn(label: heading(6, 'Status')),
+                DataColumn(label: heading(7, 'Returned Time')),
+                DataColumn(label: heading(8, 'Key Received By')),
+                DataColumn(label: heading(9, 'Remarks')),
+                DataColumn(label: heading(10, 'Actions')),
+              ],
+              rows: filteredList.asMap().entries.map((entry) {
+                final item = entry.value;
+                final rowNumber = entry.key + 1;
+                final hasScheduledCheckout =
+                    item.isPending && item.checkOutDate != null;
+                final parsedCheckoutDate = item.checkOutDate == null
+                    ? null
+                    : DateTime.tryParse(item.checkOutDate!);
+                final checkoutLabel = parsedCheckoutDate == null
+                    ? item.checkOutDate
+                    : DateFormat('d MMM yyyy').format(parsedCheckoutDate);
+                final statusColor = item.isMissing
                     ? (isDark
-                        ? const Color(0xFF7BE0A6)
-                        : RamadaColors.successText)
-                    : (isDark
-                        ? const Color(0xFFFFD180)
-                        : RamadaColors.warningText));
-            final statusBackground = item.isMissing
-                ? (isDark ? const Color(0xFF4A2528) : RamadaColors.dangerBg)
-                : (item.isFullyReturned
-                    ? (isDark
-                        ? const Color(0xFF173E2C)
-                        : RamadaColors.successBg)
-                    : (isDark
-                        ? const Color(0xFF4A3518)
-                        : RamadaColors.warningBg));
-            return DataRow(
-              cells: [
-                DataCell(Text('$rowNumber')),
-                DataCell(Text(item.issuedDateTime)),
-                DataCell(Text(item.issuingStaff)),
-                DataCell(Text(
-                  item.roomOrAccess,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color:
-                        isDark ? RamadaColors.goldLight : RamadaColors.burgundy,
-                  ),
-                )),
-                DataCell(Text('${item.qtyIssued} pcs')),
-                DataCell(Text('${item.qtyReturned} pcs')),
-                DataCell(
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: statusBackground,
-                      borderRadius: BorderRadius.circular(5),
-                      border: Border.all(
-                        color: statusColor.withValues(alpha: 0.2),
+                        ? const Color(0xFFFF9A9A)
+                        : RamadaColors.dangerText)
+                    : (item.isFullyReturned
+                        ? (isDark
+                            ? const Color(0xFF7BE0A6)
+                            : RamadaColors.successText)
+                        : (isDark
+                            ? const Color(0xFFFFD180)
+                            : RamadaColors.warningText));
+                final statusBackground = item.isMissing
+                    ? (isDark ? const Color(0xFF4A2528) : RamadaColors.dangerBg)
+                    : (item.isFullyReturned
+                        ? (isDark
+                            ? const Color(0xFF173E2C)
+                            : RamadaColors.successBg)
+                        : (isDark
+                            ? const Color(0xFF4A3518)
+                            : RamadaColors.warningBg));
+
+                return DataRow(
+                  cells: [
+                    DataCell(Text('$rowNumber')),
+                    DataCell(cellText(1, item.issuedDateTime)),
+                    DataCell(cellText(2, item.issuingStaff)),
+                    DataCell(
+                      cellText(
+                        3,
+                        item.roomOrAccess,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: isDark
+                              ? RamadaColors.goldLight
+                              : RamadaColors.burgundy,
+                        ),
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          item.isMissing
-                              ? 'MISSING'
-                              : (item.isFullyReturned ? 'RETURNED' : 'PENDING'),
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: statusColor,
-                          ),
-                        ),
-                        if (hasScheduledCheckout)
-                          Text(
-                            'Check-out $checkoutLabel',
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: statusColor,
+                    DataCell(cellText(4, '${item.qtyIssued} pcs', maxLines: 1)),
+                    DataCell(
+                        cellText(5, '${item.qtyReturned} pcs', maxLines: 1)),
+                    DataCell(
+                      SizedBox(
+                        width: columnWidths[6],
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: statusBackground,
+                            borderRadius: BorderRadius.circular(5),
+                            border: Border.all(
+                              color: statusColor.withValues(alpha: 0.2),
                             ),
                           ),
-                      ],
-                    ),
-                  ),
-                ),
-                DataCell(Text(item.returnedDateTime ?? '—')),
-                DataCell(Text(item.keyReceivedBy ?? '—')),
-                DataCell(Text(item.remarks.isEmpty ? '—' : item.remarks)),
-                DataCell(
-                  Row(
-                    children: [
-                      IconButton(
-                        tooltip: widget.session.user.isAdmin
-                            ? 'Edit log'
-                            : 'Correct log (audited)',
-                        icon: const Icon(Icons.edit_outlined, size: 18),
-                        onPressed: () => _openEditDialog(item),
-                      ),
-                      if (item.isPending)
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                              backgroundColor: isDark
-                                  ? RamadaColors.success
-                                  : RamadaColors.successText,
-                              foregroundColor: Colors.white,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 8)),
-                          onPressed: () => _openReturnDialog(item),
-                          child: const Text('Return',
-                              style: TextStyle(fontSize: 11)),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                item.isMissing
+                                    ? 'MISSING'
+                                    : (item.isFullyReturned
+                                        ? 'RETURNED'
+                                        : 'PENDING'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: statusColor,
+                                ),
+                              ),
+                              if (hasScheduledCheckout)
+                                Text(
+                                  'Check-out $checkoutLabel',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    color: statusColor,
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                      IconButton(
-                        tooltip: widget.session.user.isAdmin
-                            ? 'Delete log'
-                            : 'Delete log (audited)',
-                        icon: const Icon(Icons.delete_outline, size: 18),
-                        onPressed: () => _confirmDeleteLog(item),
                       ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          }).toList(),
-        ),
+                    ),
+                    DataCell(cellText(7, item.returnedDateTime ?? '—')),
+                    DataCell(cellText(8, item.keyReceivedBy ?? '—')),
+                    DataCell(
+                        cellText(9, item.remarks.isEmpty ? '—' : item.remarks)),
+                    DataCell(
+                      SizedBox(
+                        width: columnWidths[10],
+                        child: Wrap(
+                          spacing: compact ? 0 : 2,
+                          alignment: WrapAlignment.start,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            IconButton(
+                              tooltip: widget.session.user.isAdmin
+                                  ? 'Edit log'
+                                  : 'Correct log (audited)',
+                              icon: const Icon(Icons.edit_outlined, size: 18),
+                              visualDensity: VisualDensity.compact,
+                              constraints: const BoxConstraints.tightFor(
+                                  width: 34, height: 34),
+                              padding: EdgeInsets.zero,
+                              onPressed: () => _openEditDialog(item),
+                            ),
+                            if (item.isPending)
+                              compact
+                                  ? IconButton(
+                                      tooltip: 'Return key',
+                                      icon: const Icon(
+                                        Icons.keyboard_return_rounded,
+                                        size: 18,
+                                      ),
+                                      visualDensity: VisualDensity.compact,
+                                      constraints:
+                                          const BoxConstraints.tightFor(
+                                              width: 34, height: 34),
+                                      padding: EdgeInsets.zero,
+                                      onPressed: () => _openReturnDialog(item),
+                                    )
+                                  : ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: isDark
+                                            ? RamadaColors.success
+                                            : RamadaColors.successText,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8),
+                                      ),
+                                      onPressed: () => _openReturnDialog(item),
+                                      child: const Text(
+                                        'Return',
+                                        style: TextStyle(fontSize: 11),
+                                      ),
+                                    ),
+                            IconButton(
+                              tooltip: widget.session.user.isAdmin
+                                  ? 'Delete log'
+                                  : 'Delete log (audited)',
+                              icon: const Icon(Icons.delete_outline, size: 18),
+                              visualDensity: VisualDensity.compact,
+                              constraints: const BoxConstraints.tightFor(
+                                  width: 34, height: 34),
+                              padding: EdgeInsets.zero,
+                              onPressed: () => _confirmDeleteLog(item),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          );
+        },
       ),
     );
   }
