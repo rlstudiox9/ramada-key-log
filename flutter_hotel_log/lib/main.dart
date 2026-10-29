@@ -1744,6 +1744,8 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
   static const Duration _inventoryRefreshInterval = Duration(seconds: 5);
 
   int totalInventory = 70;
+  final ScrollController _dashboardScrollController =
+      ScrollController(keepScrollOffset: false);
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String dutyStaffName = "";
@@ -1798,6 +1800,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
     _inventoryRefreshTimer?.cancel();
     _activeShiftTimer?.cancel();
     _dailyReportTimer?.cancel();
+    _dashboardScrollController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -2545,7 +2548,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                           fontFamily: 'monospace', fontSize: 12)),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -2617,6 +2620,9 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
   }
 
   void _navigateToDashboardSection(int section) {
+    if (_dashboardScrollController.hasClients) {
+      _dashboardScrollController.jumpTo(0);
+    }
     setState(() => _selectedDashboardSection = section);
   }
 
@@ -3250,6 +3256,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
         ),
       ),
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (MediaQuery.sizeOf(context).width >= 1080)
             _buildOperationsRail(
@@ -3257,10 +3264,11 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
             ),
           Expanded(
             child: SingleChildScrollView(
+              controller: _dashboardScrollController,
               padding: EdgeInsets.fromLTRB(
                 MediaQuery.sizeOf(context).width < 700 ? 12 : 26,
                 _selectedDashboardSection == 1
-                    ? 2
+                    ? 0
                     : MediaQuery.sizeOf(context).width < 700
                         ? 12
                         : 26,
@@ -3272,7 +3280,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                 children: [
                   Padding(
                     padding: EdgeInsets.only(
-                      bottom: _selectedDashboardSection == 1 ? 4 : 20,
+                      bottom: _selectedDashboardSection == 1 ? 0 : 20,
                     ),
                     child: Row(
                       children: [
@@ -3295,7 +3303,9 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                                   letterSpacing: -0.5,
                                 ),
                               ),
-                              const SizedBox(height: 5),
+                              SizedBox(
+                                height: _selectedDashboardSection == 1 ? 2 : 5,
+                              ),
                               Text(
                                 switch (_selectedDashboardSection) {
                                   1 =>
@@ -3614,7 +3624,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
                           AnimatedSwitcher(
                             duration: const Duration(milliseconds: 240),
                             reverseDuration: const Duration(milliseconds: 180),
