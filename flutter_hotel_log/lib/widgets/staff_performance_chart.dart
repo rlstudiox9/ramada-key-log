@@ -72,15 +72,15 @@ class _StaffPerformanceChartState extends State<StaffPerformanceChart> {
 
   static const _colors = [
     Color(0xFF8F2940),
-    Color(0xFFD49D3D),
-    Color(0xFF388A6A),
-    Color(0xFF4779B8),
-    Color(0xFF895DB1),
-    Color(0xFFCE6D49),
-    Color(0xFF3999A0),
-    Color(0xFFB5537B),
-    Color(0xFF6D7D45),
-    Color(0xFF6374B8),
+    Color(0xFF9A6500),
+    Color(0xFF23704F),
+    Color(0xFF2C5F9E),
+    Color(0xFF69438E),
+    Color(0xFFA84B25),
+    Color(0xFF14737B),
+    Color(0xFF983D63),
+    Color(0xFF596B2B),
+    Color(0xFF465898),
   ];
 
   @override
@@ -88,6 +88,12 @@ class _StaffPerformanceChartState extends State<StaffPerformanceChart> {
     final theme = Theme.of(context);
     final totalKeys = widget.metrics
         .fold<int>(0, (total, metric) => total + metric.keysIssued);
+    final borderColor = theme.brightness == Brightness.light
+        ? const Color(0xFFCBD5E1)
+        : theme.dividerColor;
+    final chartTrackColor = theme.brightness == Brightness.light
+        ? const Color(0xFFCBD5E1)
+        : theme.dividerColor;
     final hoveredMetrics =
         widget.metrics.where((metric) => metric.staffName == _hoveredStaff);
     final hoveredMetric = hoveredMetrics.isEmpty ? null : hoveredMetrics.first;
@@ -97,7 +103,7 @@ class _StaffPerformanceChartState extends State<StaffPerformanceChart> {
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.55)),
+        side: BorderSide(color: borderColor),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -179,8 +185,7 @@ class _StaffPerformanceChartState extends State<StaffPerformanceChart> {
                             totalKeys: totalKeys,
                             hoveredStaff: _hoveredStaff,
                             colors: _colors,
-                            trackColor:
-                                theme.dividerColor.withValues(alpha: 0.25),
+                            trackColor: chartTrackColor,
                           ),
                           child: Center(
                             child: AnimatedSwitcher(
@@ -403,7 +408,7 @@ class _DonutPainter extends CustomPainter {
       final isHovered = metric.staffName == hoveredStaff;
       final paint = Paint()
         ..color = colors[index % colors.length].withValues(
-          alpha: hoveredStaff == null || isHovered ? 1 : 0.36,
+          alpha: hoveredStaff == null || isHovered ? 1 : 0.68,
         )
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.butt

@@ -39,6 +39,9 @@ class _InventoryDistributionChartState
     final textColor = theme.brightness == Brightness.light
         ? const Color(0xFF1F2937)
         : theme.colorScheme.onSurface;
+    final chartTrackColor = theme.brightness == Brightness.light
+        ? const Color(0xFFCBD5E1)
+        : theme.dividerColor;
     final hoveredMetric =
         _hoveredIndex == null ? null : widget.metrics[_hoveredIndex!];
     return LayoutBuilder(
@@ -80,7 +83,7 @@ class _InventoryDistributionChartState
                   painter: _InventoryDonutPainter(
                     metrics: widget.metrics,
                     hoveredIndex: _hoveredIndex,
-                    trackColor: theme.dividerColor.withValues(alpha: 0.32),
+                    trackColor: chartTrackColor,
                   ),
                   child: Center(
                     child: AnimatedSwitcher(
@@ -243,7 +246,9 @@ class _InventoryLegendItem extends StatelessWidget {
                 border: Border.all(
                   color: isHovered
                       ? metric.color.withValues(alpha: 0.7)
-                      : theme.dividerColor.withValues(alpha: 0.55),
+                      : theme.brightness == Brightness.light
+                          ? const Color(0xFFCBD5E1)
+                          : theme.dividerColor,
                 ),
                 boxShadow: isHovered
                     ? [

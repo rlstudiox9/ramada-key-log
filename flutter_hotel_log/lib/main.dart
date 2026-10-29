@@ -626,7 +626,42 @@ class _AuthScreenState extends State<AuthScreen> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Forgot password?'),
+          backgroundColor: RamadaColors.charcoalSurface,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: RamadaColors.charcoalBorder),
+          ),
+          title: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: RamadaColors.burgundy.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: RamadaColors.gold.withValues(alpha: 0.5),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.lock_reset_rounded,
+                  color: RamadaColors.goldLight,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Forgot password?',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -634,16 +669,48 @@ class _AuthScreenState extends State<AuthScreen> {
               children: [
                 const Text(
                   'Enter your username. A reset request will be sent to a hotel administrator.',
+                  style: TextStyle(
+                    color: RamadaColors.charcoalMuted,
+                    height: 1.45,
+                  ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 18),
                 TextField(
                   key: const ValueKey('forgot-username'),
                   autofocus: true,
                   textInputAction: TextInputAction.done,
                   onChanged: (value) => requestedUsername = value,
-                  decoration: const InputDecoration(
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  decoration: InputDecoration(
                     labelText: 'Username',
-                    border: OutlineInputBorder(),
+                    labelStyle:
+                        const TextStyle(color: RamadaColors.charcoalMuted),
+                    floatingLabelStyle:
+                        const TextStyle(color: RamadaColors.goldLight),
+                    filled: true,
+                    fillColor: RamadaColors.charcoalRaised,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide:
+                          const BorderSide(color: RamadaColors.charcoalBorder),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide:
+                          const BorderSide(color: RamadaColors.charcoalBorder),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide:
+                          const BorderSide(color: RamadaColors.gold, width: 2),
+                    ),
                   ),
                 ),
               ],
@@ -651,11 +718,25 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
           actions: [
             TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              ),
               onPressed:
                   isSubmitting ? null : () => Navigator.pop(dialogContext),
               child: const Text('Cancel'),
             ),
             FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: RamadaColors.burgundy,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
               onPressed: isSubmitting
                   ? null
                   : () async {
@@ -672,8 +753,25 @@ class _AuthScreenState extends State<AuthScreen> {
                         if (mounted) {
                           ScaffoldMessenger.of(this.context).showSnackBar(
                             const SnackBar(
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: RamadaColors.charcoalSurface,
+                              elevation: 8,
+                              margin: EdgeInsets.fromLTRB(20, 0, 20, 20),
+                              shape: RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius.all(Radius.circular(12)),
+                                side: BorderSide(
+                                  color: RamadaColors.gold,
+                                  width: 0.7,
+                                ),
+                              ),
+                              duration: Duration(seconds: 5),
                               content: Text(
                                 'If the account exists, an administrator will receive the reset request.',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ),
                           );
@@ -688,8 +786,21 @@ class _AuthScreenState extends State<AuthScreen> {
                         if (mounted) {
                           ScaffoldMessenger.of(this.context).showSnackBar(
                             const SnackBar(
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: RamadaColors.charcoalSurface,
+                              elevation: 8,
+                              margin: EdgeInsets.fromLTRB(20, 0, 20, 20),
+                              shape: RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius.all(Radius.circular(12)),
+                                side: BorderSide(
+                                  color: RamadaColors.danger,
+                                  width: 0.7,
+                                ),
+                              ),
                               content: Text(
                                 'Could not submit the request. Please contact the hotel administrator.',
+                                style: TextStyle(color: Colors.white),
                               ),
                             ),
                           );
@@ -1320,7 +1431,15 @@ class _AuthScreenState extends State<AuthScreen> {
                             unawaited(_setRememberUsername(value));
                           }
                         },
-                  title: const Text('Remember username on this device'),
+                  title: const Text(
+                    'Remember username on this device',
+                    style: TextStyle(
+                      color: RamadaColors.charcoalDark,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  activeColor: RamadaColors.burgundy,
+                  checkColor: Colors.white,
                   controlAffinity: ListTileControlAffinity.leading,
                   contentPadding: EdgeInsets.zero,
                   dense: true,
@@ -1691,6 +1810,25 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
               ? shifts[0]
               : shifts[1];
 
+  String _localDutyShiftKey(String shiftDate) =>
+      'duty_shift_${widget.session.user.id}_$shiftDate';
+
+  Future<String?> _loadLocalDutyShift(String shiftDate) async {
+    final preferences = await SharedPreferences.getInstance();
+    final shift = preferences.getString(_localDutyShiftKey(shiftDate));
+    return shifts.take(3).contains(shift) ? shift : null;
+  }
+
+  Future<bool> _saveLocalDutyShift(String shiftDate, String shift) async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      return await preferences.setString(_localDutyShiftKey(shiftDate), shift);
+    } catch (error, stackTrace) {
+      debugPrint('Could not save local duty shift: $error\n$stackTrace');
+      return false;
+    }
+  }
+
   Future<void> _refreshActiveShift() async {
     if (_isLoading) return;
     final now = DateTime.now();
@@ -1703,10 +1841,16 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
     try {
       var shiftForToday = currentShift;
       if (!widget.session.user.isAdmin) {
-        final assignedShift = await widget.apiService.getStaffShiftAssignment(
-          shiftDate: today,
-          token: widget.session.accessToken,
-        );
+        String? assignedShift;
+        try {
+          assignedShift = await widget.apiService.getStaffShiftAssignment(
+            shiftDate: today,
+            token: widget.session.accessToken,
+          );
+        } catch (error, stackTrace) {
+          debugPrint('Could not refresh assigned shift: $error\n$stackTrace');
+        }
+        assignedShift ??= await _loadLocalDutyShift(today);
         if (assignedShift != null && shifts.take(3).contains(assignedShift)) {
           shiftForToday = assignedShift;
         }
@@ -1741,16 +1885,18 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
       );
       issuances = await widget.apiService.getLogs();
       if (!widget.session.user.isAdmin) {
+        String? assignedShift;
         try {
-          final assignedShift = await widget.apiService.getStaffShiftAssignment(
+          assignedShift = await widget.apiService.getStaffShiftAssignment(
             shiftDate: selectedDate,
             token: widget.session.accessToken,
           );
-          if (assignedShift != null && shifts.take(3).contains(assignedShift)) {
-            selectedShift = assignedShift;
-          }
         } catch (error, stackTrace) {
           debugPrint('Could not restore assigned shift: $error\n$stackTrace');
+        }
+        assignedShift ??= await _loadLocalDutyShift(selectedDate);
+        if (assignedShift != null && shifts.take(3).contains(assignedShift)) {
+          selectedShift = assignedShift;
         }
       }
       await _syncCarryForward();
@@ -1928,23 +2074,30 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
   }
 
   Future<void> _selectShift(String shift) async {
-    final previousShift = selectedShift;
     setState(() => selectedShift = shift);
     if (widget.session.user.isAdmin) return;
     if (shift == 'All Shifts' || selectedDate == 'ALL') return;
+    await _saveLocalDutyShift(selectedDate, shift);
     try {
-      await widget.apiService.setStaffShiftAssignment(
+      final savedRemotely = await widget.apiService.setStaffShiftAssignment(
         shiftDate: selectedDate,
         shiftPeriod: shift,
         token: widget.session.accessToken,
       );
+      if (!savedRemotely) {
+        debugPrint(
+          'Duty shift endpoint is unavailable; using the device-local selection.',
+        );
+      }
     } catch (error, stackTrace) {
       debugPrint('Failed to save selected duty shift: $error\n$stackTrace');
       if (mounted) {
-        setState(() => selectedShift = previousShift);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Duty shift selection could not be saved: $error')),
+          const SnackBar(
+            content: Text(
+              'Shift selected on this device; remote sync is unavailable.',
+            ),
+          ),
         );
       }
     }
@@ -3107,7 +3260,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
               padding: EdgeInsets.fromLTRB(
                 MediaQuery.sizeOf(context).width < 700 ? 12 : 26,
                 _selectedDashboardSection == 1
-                    ? 10
+                    ? 2
                     : MediaQuery.sizeOf(context).width < 700
                         ? 12
                         : 26,
@@ -3119,7 +3272,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                 children: [
                   Padding(
                     padding: EdgeInsets.only(
-                      bottom: _selectedDashboardSection == 1 ? 12 : 20,
+                      bottom: _selectedDashboardSection == 1 ? 4 : 20,
                     ),
                     child: Row(
                       children: [
@@ -3165,46 +3318,101 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 11,
-                            vertical: 9,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? RamadaColors.charcoalSurface
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isDark
-                                  ? RamadaColors.charcoalBorder
-                                  : const Color(0xFFD8DEE8),
-                            ),
-                          ),
-                          child: Row(
+                        if (_selectedDashboardSection == 1)
+                          Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
-                                Icons.calendar_today_rounded,
-                                size: 14,
-                                color: isDark
-                                    ? RamadaColors.goldLight
-                                    : RamadaColors.burgundy,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                DateFormat('EEE, d MMM').format(DateTime.now()),
-                                style: TextStyle(
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
                                   color: isDark
-                                      ? Colors.white
-                                      : RamadaColors.charcoalDark,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
+                                      ? RamadaColors.charcoalRaised
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: isDark
+                                        ? RamadaColors.charcoalBorder
+                                        : const Color(0xFFCBD5E1),
+                                  ),
+                                ),
+                                child: Text(
+                                  '${filteredList.length} entries',
+                                  style: TextStyle(
+                                    color: isDark
+                                        ? RamadaColors.charcoalMuted
+                                        : const Color(0xFF334155),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 2),
+                              IconButton(
+                                key: const ValueKey('key-log-view-toggle'),
+                                tooltip: _showTimeline
+                                    ? 'Switch to key log table'
+                                    : 'Switch to key timeline',
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () {
+                                  setState(
+                                      () => _showTimeline = !_showTimeline);
+                                },
+                                icon: Icon(
+                                  _showTimeline
+                                      ? Icons.table_rows_rounded
+                                      : Icons.timeline_rounded,
+                                  color: isDark
+                                      ? RamadaColors.goldLight
+                                      : RamadaColors.burgundy,
                                 ),
                               ),
                             ],
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 11,
+                              vertical: 9,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? RamadaColors.charcoalSurface
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isDark
+                                    ? RamadaColors.charcoalBorder
+                                    : const Color(0xFFB8C2D0),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.calendar_today_rounded,
+                                  size: 14,
+                                  color: isDark
+                                      ? RamadaColors.goldLight
+                                      : RamadaColors.burgundy,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  DateFormat('EEE, d MMM')
+                                      .format(DateTime.now()),
+                                  style: TextStyle(
+                                    color: isDark
+                                        ? Colors.white
+                                        : RamadaColors.charcoalDark,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -3238,90 +3446,6 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Padding(
-                            padding: const EdgeInsets.only(
-                              top: 4,
-                              bottom: 14,
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Key log',
-                                        style: TextStyle(
-                                          color: isDark
-                                              ? Colors.white
-                                              : RamadaColors.charcoalDark,
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        'Search and manage issued key cards',
-                                        style: TextStyle(
-                                          color: isDark
-                                              ? RamadaColors.charcoalMuted
-                                              : const Color(0xFF526174),
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isDark
-                                        ? RamadaColors.charcoalRaised
-                                        : Colors.white,
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: isDark
-                                          ? RamadaColors.charcoalBorder
-                                          : const Color(0xFFD8DEE8),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    '${filteredList.length} entries',
-                                    style: TextStyle(
-                                      color: isDark
-                                          ? RamadaColors.charcoalMuted
-                                          : const Color(0xFF526174),
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                IconButton(
-                                  key: const ValueKey('key-log-view-toggle'),
-                                  tooltip: _showTimeline
-                                      ? 'Switch to key log table'
-                                      : 'Switch to key timeline',
-                                  onPressed: () {
-                                    setState(
-                                        () => _showTimeline = !_showTimeline);
-                                  },
-                                  icon: Icon(
-                                    _showTimeline
-                                        ? Icons.table_rows_rounded
-                                        : Icons.timeline_rounded,
-                                    color: isDark
-                                        ? RamadaColors.goldLight
-                                        : RamadaColors.burgundy,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                           // Filters & Search
                           LayoutBuilder(
                             builder: (context, constraints) {
@@ -3352,8 +3476,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                                     borderSide: BorderSide(
                                       color: isDark
                                           ? RamadaColors.charcoalBorder
-                                          : RamadaColors.burgundy
-                                              .withValues(alpha: 0.18),
+                                          : const Color(0xFFB8C2D0),
                                     ),
                                   ),
                                   contentPadding: const EdgeInsets.symmetric(
@@ -3401,8 +3524,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                                         borderSide: BorderSide(
                                           color: isDark
                                               ? RamadaColors.charcoalBorder
-                                              : RamadaColors.burgundy
-                                                  .withValues(alpha: 0.18),
+                                              : const Color(0xFFB8C2D0),
                                         ),
                                       ),
                                     ),
@@ -3849,9 +3971,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: isDark
-              ? RamadaColors.charcoalBorder
-              : RamadaColors.burgundy.withValues(alpha: 0.12),
+          color: isDark ? RamadaColors.charcoalBorder : const Color(0xFFCBD5E1),
         ),
       ),
       child: Padding(
@@ -3920,27 +4040,27 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                 InventoryMetric(
                   label: 'Total Keys',
                   count: totalInventory,
-                  color: const Color(0xFFE85D75),
+                  color: const Color(0xFFC43F59),
                 ),
                 InventoryMetric(
                   label: 'Handover Issued',
                   count: handoverToGuest,
-                  color: const Color(0xFF3B9AE1),
+                  color: const Color(0xFF1769AA),
                 ),
                 InventoryMetric(
                   label: 'Return from Guest',
                   count: returnFromGuest,
-                  color: const Color(0xFF21A675),
+                  color: const Color(0xFF14805C),
                 ),
                 InventoryMetric(
                   label: 'Missing',
                   count: missingKeys,
-                  color: const Color(0xFFED8A24),
+                  color: const Color(0xFFB45309),
                 ),
                 InventoryMetric(
                   label: 'Available at Desk',
                   count: remainingInFd,
-                  color: const Color(0xFFB387E8),
+                  color: const Color(0xFF7441A6),
                 ),
               ],
               onMetricTap: (label) {

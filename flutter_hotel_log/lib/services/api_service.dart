@@ -333,6 +333,7 @@ class ApiService {
       ),
       headers: {'authorization': 'Bearer $token'},
     );
+    if (response.statusCode == 404) return null;
     _checkResponse(response, expectedStatusCode: 200);
     final decoded = jsonDecode(response.body);
     if (decoded is! Map ||
@@ -345,7 +346,7 @@ class ApiService {
     return decoded['shift_period'] as String?;
   }
 
-  Future<void> setStaffShiftAssignment({
+  Future<bool> setStaffShiftAssignment({
     required String shiftDate,
     required String shiftPeriod,
     required String token,
@@ -361,7 +362,9 @@ class ApiService {
         'shift_period': shiftPeriod,
       }),
     );
+    if (response.statusCode == 404) return false;
     _checkResponse(response, expectedStatusCode: 200);
+    return true;
   }
 
   Future<StaffRosterMember> addStaffRosterMember({
