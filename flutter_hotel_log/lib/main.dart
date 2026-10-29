@@ -28,11 +28,11 @@ class RamadaColors {
   static const Color gold = Color(0xFFC5A059);
   static const Color goldLight = Color(0xFFDFBA76);
   static const Color goldContainer = Color(0xFFF9F3E8);
-  static const Color charcoalDark = Color(0xFF0B1020);
-  static const Color charcoalSurface = Color(0xFF111827);
-  static const Color charcoalRaised = Color(0xFF1A2436);
-  static const Color charcoalBorder = Color(0xFF28354A);
-  static const Color charcoalMuted = Color(0xFF9AA9BD);
+  static const Color charcoalDark = Color(0xFF101820);
+  static const Color charcoalSurface = Color(0xFF18232D);
+  static const Color charcoalRaised = Color(0xFF202D38);
+  static const Color charcoalBorder = Color(0xFF344451);
+  static const Color charcoalMuted = Color(0xFFA8B5C2);
   static const Color creamBg = Color(0xFFFBF9F5);
   static const Color white = Colors.white;
 
@@ -1626,8 +1626,6 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
   String selectedShift = "Morning (07:00 - 15:00)";
   String searchQuery = "";
   String activeFilter = "ALL"; // ALL, PENDING, RETURNED, MISSING, CARRIED
-  final GlobalKey _overviewSectionKey = GlobalKey();
-  final GlobalKey _logsSectionKey = GlobalKey();
   int _selectedDashboardSection = 0;
   bool _isLoading = true;
   String? _storageError;
@@ -1761,7 +1759,13 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
     _isCheckingDailyReport = true;
     try {
       final report = await widget.apiService.getLatestDailyReport();
-      if (report == null || !mounted) return;
+      if (report == null) {
+        if (mounted && _dailyReportError != null) {
+          setState(() => _dailyReportError = null);
+        }
+        return;
+      }
+      if (!mounted) return;
 
       final preferences = await SharedPreferences.getInstance();
       final lastDownloaded =
@@ -2426,18 +2430,6 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
 
   void _navigateToDashboardSection(int section) {
     setState(() => _selectedDashboardSection = section);
-    final targetContext =
-        (section == 0 ? _overviewSectionKey : _logsSectionKey).currentContext;
-    if (targetContext != null) {
-      unawaited(
-        Scrollable.ensureVisible(
-          targetContext,
-          duration: const Duration(milliseconds: 220),
-          alignment: 0.06,
-          curve: Curves.easeOutCubic,
-        ),
-      );
-    }
   }
 
   Widget _buildOperationsRail({required bool extended}) => Container(
@@ -2586,6 +2578,11 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                       icon: Icon(Icons.vpn_key_outlined),
                       selectedIcon: Icon(Icons.vpn_key_rounded),
                       label: Text('Key log'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.analytics_outlined),
+                      selectedIcon: Icon(Icons.analytics_rounded),
+                      label: Text('Reports'),
                     ),
                   ],
                 ),
@@ -2869,7 +2866,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                 MediaQuery.sizeOf(context).width < 700 ? 12 : 26,
                 MediaQuery.sizeOf(context).width < 700 ? 12 : 26,
                 MediaQuery.sizeOf(context).width < 700 ? 12 : 26,
-                160,
+                32,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2883,7 +2880,11 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Operations overview',
+                                switch (_selectedDashboardSection) {
+                                  1 => 'Key Operations',
+                                  2 => 'Reports & Analytics',
+                                  _ => 'Operations overview',
+                                },
                                 style: TextStyle(
                                   color: isDark
                                       ? Colors.white
@@ -2895,7 +2896,14 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                               ),
                               const SizedBox(height: 5),
                               Text(
-                                'Front desk key inventory and shift activity',
+                                switch (_selectedDashboardSection) {
+                                  1 =>
+                                    'Search, issue and return guest key cards',
+                                  2 =>
+                                    'Historical activity and shift automation',
+                                  _ =>
+                                    'Front desk key inventory and shift activity',
+                                },
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -2970,213 +2978,219 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                         ),
                       ],
                     ),
-                  // Metrics Dashboard Box
-                  KeyedSubtree(
-                    key: _overviewSectionKey,
-                    child: _buildInventoryMetricsBox(),
-                  ),
-                  const SizedBox(height: 16),
-                  KeyedSubtree(
-                    key: _logsSectionKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(
-                            top: 4,
-                            bottom: 14,
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Key log',
-                                      style: TextStyle(
-                                        color: isDark
-                                            ? Colors.white
-                                            : RamadaColors.charcoalDark,
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w800,
+                  if (_selectedDashboardSection == 0) ...[
+                    _buildDashboardShiftControl(),
+                    const SizedBox(height: 16),
+                    _buildInventoryMetricsBox(),
+                    const SizedBox(height: 16),
+                    StaffPerformanceChart(metrics: _staffPerformanceMetrics),
+                  ],
+                  if (_selectedDashboardSection == 1)
+                    KeyedSubtree(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              top: 4,
+                              bottom: 14,
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Key log',
+                                        style: TextStyle(
+                                          color: isDark
+                                              ? Colors.white
+                                              : RamadaColors.charcoalDark,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w800,
+                                        ),
                                       ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        'Search and manage issued key cards',
+                                        style: TextStyle(
+                                          color: isDark
+                                              ? RamadaColors.charcoalMuted
+                                              : const Color(0xFF526174),
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? RamadaColors.charcoalRaised
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: isDark
+                                          ? RamadaColors.charcoalBorder
+                                          : const Color(0xFFD8DEE8),
                                     ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      'Search and manage issued key cards',
-                                      style: TextStyle(
+                                  ),
+                                  child: Text(
+                                    '${filteredList.length} entries',
+                                    style: TextStyle(
+                                      color: isDark
+                                          ? RamadaColors.charcoalMuted
+                                          : const Color(0xFF526174),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Filters & Search
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              final searchField = TextField(
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: isDark
+                                      ? RamadaColors.charcoalRaised
+                                      : Colors.white,
+                                  prefixIcon: Icon(
+                                    Icons.search,
+                                    color: isDark
+                                        ? RamadaColors.charcoalMuted
+                                        : const Color(0xFF526174),
+                                  ),
+                                  hintText: 'Search room, guest or staff',
+                                  hintStyle: TextStyle(
+                                    color: isDark
+                                        ? RamadaColors.charcoalMuted
+                                        : const Color(0xFF64748B),
+                                    fontSize: 12,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(11),
+                                    borderSide: BorderSide(
+                                      color: isDark
+                                          ? RamadaColors.charcoalBorder
+                                          : RamadaColors.burgundy
+                                              .withValues(alpha: 0.18),
+                                    ),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 12,
+                                  ),
+                                ),
+                                onChanged: (v) =>
+                                    setState(() => searchQuery = v),
+                              );
+                              final shiftSelector = SizedBox(
+                                width: constraints.maxWidth < 680
+                                    ? double.infinity
+                                    : 270,
+                                child: Tooltip(
+                                  message: 'Select your duty shift',
+                                  child: InputDecorator(
+                                    decoration: InputDecoration(
+                                      labelText: 'Duty Shift',
+                                      labelStyle: TextStyle(
                                         color: isDark
                                             ? RamadaColors.charcoalMuted
                                             : const Color(0xFF526174),
                                         fontSize: 11,
                                       ),
+                                      filled: true,
+                                      fillColor: isDark
+                                          ? RamadaColors.charcoalRaised
+                                          : Colors.white,
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(11),
+                                        borderSide: BorderSide(
+                                          color: isDark
+                                              ? RamadaColors.charcoalBorder
+                                              : const Color(0xFFD8DEE8),
+                                        ),
+                                      ),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 4,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(11),
+                                        borderSide: BorderSide(
+                                          color: isDark
+                                              ? RamadaColors.charcoalBorder
+                                              : RamadaColors.burgundy
+                                                  .withValues(alpha: 0.18),
+                                        ),
+                                      ),
                                     ),
+                                    child: DropdownButtonHideUnderline(
+                                      child: DropdownButton<String>(
+                                        key: const ValueKey(
+                                            'dashboard:duty-shift'),
+                                        value: selectedShift,
+                                        isExpanded: true,
+                                        items: shifts
+                                            .where((shift) =>
+                                                widget.session.user.isAdmin ||
+                                                shift != 'All Shifts')
+                                            .map((s) => DropdownMenuItem(
+                                                value: s, child: Text(s)))
+                                            .toList(),
+                                        onChanged: (value) {
+                                          if (value != null) {
+                                            unawaited(_selectShift(value));
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                              if (constraints.maxWidth < 680) {
+                                return Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    searchField,
+                                    const SizedBox(height: 12),
+                                    shiftSelector,
                                   ],
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isDark
-                                      ? RamadaColors.charcoalRaised
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: isDark
-                                        ? RamadaColors.charcoalBorder
-                                        : const Color(0xFFD8DEE8),
-                                  ),
-                                ),
-                                child: Text(
-                                  '${filteredList.length} entries',
-                                  style: TextStyle(
-                                    color: isDark
-                                        ? RamadaColors.charcoalMuted
-                                        : const Color(0xFF526174),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Filters & Search
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final searchField = TextField(
-                              decoration: InputDecoration(
-                                filled: true,
-                                fillColor: isDark
-                                    ? RamadaColors.charcoalRaised
-                                    : Colors.white,
-                                prefixIcon: Icon(
-                                  Icons.search,
-                                  color: isDark
-                                      ? RamadaColors.charcoalMuted
-                                      : const Color(0xFF526174),
-                                ),
-                                hintText: 'Search room, guest or staff',
-                                hintStyle: TextStyle(
-                                  color: isDark
-                                      ? RamadaColors.charcoalMuted
-                                      : const Color(0xFF64748B),
-                                  fontSize: 12,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(11),
-                                  borderSide: BorderSide(
-                                    color: isDark
-                                        ? RamadaColors.charcoalBorder
-                                        : RamadaColors.burgundy
-                                            .withValues(alpha: 0.18),
-                                  ),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 12,
-                                ),
-                              ),
-                              onChanged: (v) => setState(() => searchQuery = v),
-                            );
-                            final shiftSelector = SizedBox(
-                              width: constraints.maxWidth < 680
-                                  ? double.infinity
-                                  : 270,
-                              child: Tooltip(
-                                message: 'Select your duty shift',
-                                child: InputDecorator(
-                                  decoration: InputDecoration(
-                                    labelText: 'Duty Shift',
-                                    labelStyle: TextStyle(
-                                      color: isDark
-                                          ? RamadaColors.charcoalMuted
-                                          : const Color(0xFF526174),
-                                      fontSize: 11,
-                                    ),
-                                    filled: true,
-                                    fillColor: isDark
-                                        ? RamadaColors.charcoalRaised
-                                        : Colors.white,
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(11),
-                                      borderSide: BorderSide(
-                                        color: isDark
-                                            ? RamadaColors.charcoalBorder
-                                            : const Color(0xFFD8DEE8),
-                                      ),
-                                    ),
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 4,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(11),
-                                      borderSide: BorderSide(
-                                        color: isDark
-                                            ? RamadaColors.charcoalBorder
-                                            : RamadaColors.burgundy
-                                                .withValues(alpha: 0.18),
-                                      ),
-                                    ),
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      key: const ValueKey(
-                                          'dashboard:duty-shift'),
-                                      value: selectedShift,
-                                      isExpanded: true,
-                                      items: shifts
-                                          .where((shift) =>
-                                              widget.session.user.isAdmin ||
-                                              shift != 'All Shifts')
-                                          .map((s) => DropdownMenuItem(
-                                              value: s, child: Text(s)))
-                                          .toList(),
-                                      onChanged: (value) {
-                                        if (value != null) {
-                                          unawaited(_selectShift(value));
-                                        }
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                            if (constraints.maxWidth < 680) {
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                );
+                              }
+                              return Row(
                                 children: [
-                                  searchField,
-                                  const SizedBox(height: 12),
+                                  Expanded(child: searchField),
+                                  const SizedBox(width: 12),
                                   shiftSelector,
                                 ],
                               );
-                            }
-                            return Row(
-                              children: [
-                                Expanded(child: searchField),
-                                const SizedBox(width: 12),
-                                shiftSelector,
-                              ],
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 12),
+                            },
+                          ),
+                          const SizedBox(height: 12),
 
-                        // Table of records
-                        _buildIssuanceTable(),
-                      ],
+                          // Table of records
+                          _buildIssuanceTable(),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildShiftAutomationBanner(isDark),
-                  const SizedBox(height: 16),
-                  StaffPerformanceChart(metrics: _staffPerformanceMetrics),
+                  if (_selectedDashboardSection == 2) ...[
+                    _buildShiftAutomationBanner(isDark),
+                    const SizedBox(height: 16),
+                    _buildReportsAnalytics(isDark),
+                  ],
                 ],
               ),
             ),
@@ -3201,20 +3215,292 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                   selectedIcon: Icon(Icons.vpn_key_rounded),
                   label: 'Key log',
                 ),
+                NavigationDestination(
+                  icon: Icon(Icons.analytics_outlined),
+                  selectedIcon: Icon(Icons.analytics_rounded),
+                  label: 'Reports',
+                ),
               ],
             )
           : null,
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: RamadaColors.gold,
-        foregroundColor: RamadaColors.charcoalDark,
-        elevation: 1,
-        hoverElevation: 3,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        onPressed: _openAddDialog,
-        icon: const Icon(Icons.add),
-        label: const Text('Issue Key Card',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-      ),
+      floatingActionButton: _selectedDashboardSection == 1
+          ? FloatingActionButton.extended(
+              backgroundColor: RamadaColors.gold,
+              foregroundColor: RamadaColors.charcoalDark,
+              elevation: 1,
+              hoverElevation: 3,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+              onPressed: _openAddDialog,
+              icon: const Icon(Icons.add),
+              label: const Text('Issue Key Card',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+            )
+          : null,
+    );
+  }
+
+  Widget _buildDashboardShiftControl() => Card(
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: RamadaColors.charcoalBorder),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Row(
+                children: [
+                  Icon(
+                    Icons.schedule_rounded,
+                    color: RamadaColors.goldLight,
+                    size: 20,
+                  ),
+                  SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ACTIVE SHIFT',
+                        style: TextStyle(
+                          color: RamadaColors.charcoalMuted,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      SizedBox(height: 3),
+                      Text(
+                        'Inventory snapshot',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              DropdownButton<String>(
+                key: const ValueKey('dashboard:duty-shift'),
+                isExpanded: true,
+                value: selectedShift,
+                items: shifts
+                    .where((shift) =>
+                        widget.session.user.isAdmin || shift != 'All Shifts')
+                    .map((shift) => DropdownMenuItem(
+                          value: shift,
+                          child: Text(shift),
+                        ))
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) unawaited(_selectShift(value));
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+
+  Widget _buildReportsAnalytics(bool isDark) {
+    final historicalEntries = List<KeyIssuanceItem>.of(issuances)
+      ..sort((first, second) {
+        final dateOrder = second.shiftDate.compareTo(first.shiftDate);
+        return dateOrder != 0 ? dateOrder : second.sNo.compareTo(first.sNo);
+      });
+    final recordedDates =
+        issuances.map((entry) => entry.shiftDate).toSet().length;
+    final carriedEntries =
+        issuances.where((entry) => entry.isCarriedForward).length;
+    final surfaceColor = isDark ? RamadaColors.charcoalSurface : Colors.white;
+    final borderColor = isDark
+        ? RamadaColors.charcoalBorder
+        : RamadaColors.burgundy.withValues(alpha: 0.12);
+
+    Widget summaryCard(
+      double width,
+      String label,
+      String value,
+      IconData icon,
+    ) =>
+        SizedBox(
+          width: width,
+          child: Card(
+            margin: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(color: borderColor),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(icon, color: RamadaColors.goldLight, size: 20),
+                  const SizedBox(height: 14),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 23,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: RamadaColors.charcoalMuted,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            const gap = 12.0;
+            final cardWidth = constraints.maxWidth < 520
+                ? constraints.maxWidth
+                : (constraints.maxWidth - gap * 2) / 3;
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: [
+                summaryCard(cardWidth, 'Historical log entries',
+                    '${issuances.length}', Icons.receipt_long_outlined),
+                summaryCard(cardWidth, 'Dates represented', '$recordedDates',
+                    Icons.event_note),
+                summaryCard(cardWidth, 'Carry-forward records',
+                    '$carriedEntries', Icons.sync_alt_rounded),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 18),
+        Card(
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: borderColor),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Historical key activity',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Latest entries across all recorded dates and shifts',
+                  style: TextStyle(
+                    color: RamadaColors.charcoalMuted,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                if (historicalEntries.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child:
+                        Center(child: Text('No historical key activity yet.')),
+                  )
+                else
+                  ...historicalEntries.take(12).map((entry) {
+                    final date = DateTime.tryParse(entry.shiftDate);
+                    final dateLabel = date == null
+                        ? entry.shiftDate
+                        : DateFormat('d MMM yyyy').format(date);
+                    final status = entry.isMissing
+                        ? 'Missing'
+                        : entry.isFullyReturned
+                            ? 'Returned'
+                            : 'Outstanding';
+                    final statusColor = entry.isMissing
+                        ? RamadaColors.danger
+                        : entry.isFullyReturned
+                            ? RamadaColors.success
+                            : RamadaColors.warning;
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: CircleAvatar(
+                        backgroundColor:
+                            RamadaColors.gold.withValues(alpha: 0.12),
+                        child: Icon(
+                          entry.isCarriedForward
+                              ? Icons.sync_alt_rounded
+                              : Icons.vpn_key_rounded,
+                          color: RamadaColors.goldLight,
+                          size: 18,
+                        ),
+                      ),
+                      title: Text(
+                        '${entry.roomOrAccess}  ·  ${entry.issuingStaff}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      subtitle: Text(
+                        '$dateLabel  ·  ${entry.shiftPeriod}  ·  ${entry.qtyIssued} issued',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: Text(
+                        status,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    );
+                  }),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: surfaceColor,
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: borderColor),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.auto_mode_rounded, color: RamadaColors.goldLight),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Daily CSV reports are generated automatically; recent reports download when this app is open.',
+                  style: TextStyle(
+                    color: RamadaColors.charcoalMuted,
+                    fontSize: 11,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

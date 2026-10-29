@@ -256,6 +256,7 @@ class ApiService {
       _baseUri.resolve('/reports/daily/latest'),
       headers: _authHeaders,
     );
+    if (response.statusCode == 404) return null;
     _checkResponse(response, expectedStatusCode: 200);
     final decoded = jsonDecode(response.body);
     if (decoded is! Map || !decoded.containsKey('report')) {
