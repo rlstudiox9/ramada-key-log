@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,8 +12,10 @@ import 'models/key_issuance.dart';
 import 'models/staff_roster_member.dart';
 import 'services/api_service.dart';
 import 'utils/file_download.dart';
+import 'utils/key_log_document_export.dart';
 import 'utils/key_log_export.dart';
 import 'widgets/inventory_distribution_chart.dart';
+import 'widgets/key_status_badge.dart';
 import 'widgets/staff_performance_chart.dart';
 
 void main() {
@@ -1622,11 +1625,14 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
   static const Duration _inventoryRefreshInterval = Duration(seconds: 5);
 
   int totalInventory = 70;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   String dutyStaffName = "";
   String selectedDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
   String selectedShift = "Morning (07:00 - 15:00)";
   String searchQuery = "";
   String activeFilter = "ALL"; // ALL, PENDING, RETURNED, MISSING, CARRIED
+  bool _showTimeline = false;
   int _selectedDashboardSection = 0;
   bool _isLoading = true;
   String? _storageError;
@@ -1673,6 +1679,8 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
     _inventoryRefreshTimer?.cancel();
     _activeShiftTimer?.cancel();
     _dailyReportTimer?.cancel();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -2693,6 +2701,213 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
         ),
       );
 
+  Future<void> _openQuickIssue() async {
+    if (_selectedDashboardSection != 1) {
+      _navigateToDashboardSection(1);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openAddDialog();
+      });
+      return;
+    }
+    _openAddDialog();
+  }
+
+  void _focusRoomSearch() {
+    if (_selectedDashboardSection != 1) {
+      _navigateToDashboardSection(1);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _searchFocusNode.requestFocus();
+    });
+  }
+
+  Future<void> _exportDocument({required bool asPdf}) async {
+    try {
+      final entries = filteredList;
+      final filename = 'ramada-key-log-$selectedDate';
+      final bytes = asPdf
+          ? await KeyLogDocumentExport.toPdf(entries)
+          : KeyLogDocumentExport.toExcel(entries);
+      downloadBinaryFile(
+        bytes,
+        '$filename.${asPdf ? 'pdf' : 'xlsx'}',
+        asPdf
+            ? 'application/pdf'
+            : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${asPdf ? 'PDF' : 'Excel'} export downloaded '
+            '(${entries.length} records).',
+          ),
+        ),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Key log document export failed: $error\n$stackTrace');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Export failed: $error'),
+          backgroundColor: RamadaColors.danger,
+        ),
+      );
+    }
+  }
+
+  Future<void> _showExportFormats() async {
+    final format = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Export filtered key log',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                key: const ValueKey('export-format-pdf'),
+                onPressed: () => Navigator.pop(context, true),
+                icon: const Icon(Icons.picture_as_pdf_outlined),
+                label: const Text('Download PDF'),
+              ),
+              OutlinedButton.icon(
+                key: const ValueKey('export-format-xlsx'),
+                onPressed: () => Navigator.pop(context, false),
+                icon: const Icon(Icons.table_view_outlined),
+                label: const Text('Download Excel workbook'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (format != null && mounted) {
+      await _exportDocument(asPdf: format);
+    }
+  }
+
+  Widget _buildFloatingControlBar(bool isDark) {
+    final textColor = isDark ? Colors.white : RamadaColors.charcoalDark;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 820),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                  decoration: BoxDecoration(
+                    color:
+                        (isDark ? RamadaColors.charcoalSurface : Colors.white)
+                            .withValues(alpha: isDark ? 0.88 : 0.9),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: (isDark
+                              ? RamadaColors.goldLight
+                              : RamadaColors.burgundy)
+                          .withValues(alpha: 0.42),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: RamadaColors.gold.withValues(alpha: 0.14),
+                        blurRadius: 18,
+                        spreadRadius: 1,
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.12),
+                        blurRadius: 16,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compact = constraints.maxWidth < 560;
+                      return Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: compact ? 4 : 12,
+                        runSpacing: 4,
+                        children: [
+                          KeyStatusBadge(
+                            status: KeyStatus.available,
+                            isDark: isDark,
+                            count: remainingInFd,
+                          ),
+                          _dockAction(
+                            tooltip: 'Issue a key',
+                            label: compact ? 'Issue' : '+ Issue Key',
+                            icon: Icons.add_rounded,
+                            onPressed: _openQuickIssue,
+                            color: textColor,
+                          ),
+                          _dockAction(
+                            tooltip: 'Search room',
+                            label: compact ? 'Search' : 'Search Room',
+                            icon: Icons.search_rounded,
+                            onPressed: _focusRoomSearch,
+                            color: textColor,
+                          ),
+                          _dockAction(
+                            tooltip: 'Export PDF or Excel',
+                            label: compact ? 'Export' : 'Export PDF/Excel',
+                            icon: Icons.file_download_outlined,
+                            onPressed: _showExportFormats,
+                            color: textColor,
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _dockAction({
+    required String tooltip,
+    required String label,
+    required IconData icon,
+    required VoidCallback onPressed,
+    required Color color,
+  }) =>
+      Tooltip(
+        message: tooltip,
+        child: TextButton.icon(
+          onPressed: onPressed,
+          icon: Icon(icon, size: 18),
+          label: Text(label),
+          style: TextButton.styleFrom(
+            foregroundColor: color,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -3085,6 +3300,25 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                                     ),
                                   ),
                                 ),
+                                const SizedBox(width: 4),
+                                IconButton(
+                                  key: const ValueKey('key-log-view-toggle'),
+                                  tooltip: _showTimeline
+                                      ? 'Switch to key log table'
+                                      : 'Switch to key timeline',
+                                  onPressed: () {
+                                    setState(
+                                        () => _showTimeline = !_showTimeline);
+                                  },
+                                  icon: Icon(
+                                    _showTimeline
+                                        ? Icons.table_rows_rounded
+                                        : Icons.timeline_rounded,
+                                    color: isDark
+                                        ? RamadaColors.goldLight
+                                        : RamadaColors.burgundy,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -3092,6 +3326,9 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                           LayoutBuilder(
                             builder: (context, constraints) {
                               final searchField = TextField(
+                                key: const ValueKey('key-log-search-field'),
+                                controller: _searchController,
+                                focusNode: _searchFocusNode,
                                 decoration: InputDecoration(
                                   filled: true,
                                   fillColor: isDark
@@ -3256,8 +3493,22 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          // Table of records
-                          _buildIssuanceTable(),
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 240),
+                            reverseDuration: const Duration(milliseconds: 180),
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            child: KeyedSubtree(
+                              key: ValueKey(
+                                '${_showTimeline ? 'timeline' : 'table'}-'
+                                '$activeFilter-$selectedDate-$selectedShift-'
+                                '${filteredList.map((item) => item.toMap()).toList()}',
+                              ),
+                              child: _showTimeline
+                                  ? _buildKeyTimeline(isDark)
+                                  : _buildIssuanceTable(),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -3272,8 +3523,12 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: MediaQuery.sizeOf(context).width < 1080
-          ? NavigationBar(
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildFloatingControlBar(isDark),
+          if (MediaQuery.sizeOf(context).width < 1080)
+            NavigationBar(
               height: 64,
               backgroundColor: RamadaColors.charcoalSurface,
               indicatorColor: RamadaColors.burgundy.withValues(alpha: 0.35),
@@ -3296,22 +3551,9 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                   label: 'Reports',
                 ),
               ],
-            )
-          : null,
-      floatingActionButton: _selectedDashboardSection == 1
-          ? FloatingActionButton.extended(
-              backgroundColor: RamadaColors.gold,
-              foregroundColor: RamadaColors.charcoalDark,
-              elevation: 1,
-              hoverElevation: 3,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
-              onPressed: _openAddDialog,
-              icon: const Icon(Icons.add),
-              label: const Text('Issue Key Card',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-            )
-          : null,
+            ),
+        ],
+      ),
     );
   }
 
@@ -3857,6 +4099,227 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
     );
   }
 
+  Widget _buildKeyTimeline(bool isDark) {
+    final entries = filteredList;
+    if (entries.isEmpty) {
+      return const Card(
+        key: ValueKey('key-log-empty-timeline'),
+        child: Padding(
+          padding: EdgeInsets.all(28),
+          child: Center(child: Text('No key activity matches these filters.')),
+        ),
+      );
+    }
+
+    final primaryColor = isDark ? Colors.white : RamadaColors.charcoalDark;
+    final secondaryColor =
+        isDark ? RamadaColors.charcoalMuted : const Color(0xFF475569);
+    final connectorColor =
+        isDark ? RamadaColors.charcoalBorder : const Color(0xFFD1D9E3);
+    final accentColor = isDark ? RamadaColors.goldLight : RamadaColors.burgundy;
+
+    DateTime? parseDateTime(String? value) {
+      if (value == null || value.isEmpty) return null;
+      return DateTime.tryParse(value) ??
+          DateFormat('dd-MMM-yyyy hh:mm a').tryParse(value);
+    }
+
+    return Column(
+      key: const ValueKey('key-log-timeline'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final item in entries)
+          Builder(
+            builder: (context) {
+              final checkoutDate = item.checkOutDate == null
+                  ? null
+                  : DateTime.tryParse(item.checkOutDate!);
+              final isLongStay = item.isPending &&
+                  checkoutDate != null &&
+                  DateUtils.dateOnly(checkoutDate)
+                      .isBefore(DateUtils.dateOnly(DateTime.now()));
+              final status = item.isMissing
+                  ? KeyStatus.missing
+                  : item.isFullyReturned
+                      ? KeyStatus.returned
+                      : isLongStay
+                          ? KeyStatus.longStay
+                          : KeyStatus.issued;
+              final events = <(DateTime?, String, String, IconData, Color)>[
+                (
+                  parseDateTime(item.issuedDateTime),
+                  'Key issued',
+                  '${item.qtyIssued} key cards · ${item.issuingStaff} on duty',
+                  Icons.vpn_key_rounded,
+                  const Color(0xFF3B9AE1),
+                ),
+                if (item.qtyReturned > 0)
+                  (
+                    parseDateTime(item.returnedDateTime),
+                    'Key returned',
+                    '${item.qtyReturned} returned'
+                        '${item.keyReceivedBy == null ? '' : ' · Received by ${item.keyReceivedBy}'}',
+                    Icons.keyboard_return_rounded,
+                    const Color(0xFF21A675),
+                  ),
+                if (item.isMissing)
+                  (
+                    null,
+                    'Key marked missing',
+                    '${item.missingQuantity} key cards marked missing',
+                    Icons.warning_amber_rounded,
+                    const Color(0xFFE44855),
+                  ),
+              ]..sort((a, b) {
+                  if (a.$1 == null) return 1;
+                  if (b.$1 == null) return -1;
+                  return a.$1!.compareTo(b.$1!);
+                });
+              return Card(
+                key: ValueKey('timeline-entry-${item.id}'),
+                color: isDark ? RamadaColors.charcoalSurface : Colors.white,
+                margin: const EdgeInsets.only(bottom: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: BorderSide(
+                    color: isDark
+                        ? RamadaColors.charcoalBorder
+                        : const Color(0xFFD1D9E3),
+                  ),
+                ),
+                child: Tooltip(
+                  message: 'Open key log entry',
+                  child: InkWell(
+                    onTap: () => _openEditDialog(item),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  item.roomOrAccess,
+                                  style: TextStyle(
+                                    color: primaryColor,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              KeyStatusBadge(status: status, isDark: isDark),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '${item.guestOrHolderName.isEmpty ? 'Guest not specified' : item.guestOrHolderName}'
+                            ' · ${item.shiftDate} · ${item.shiftPeriod}',
+                            style: TextStyle(
+                              color: secondaryColor,
+                              fontSize: 11,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          for (var index = 0; index < events.length; index++)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SizedBox(
+                                  width: 28,
+                                  child: Column(
+                                    children: [
+                                      Container(
+                                        width: 24,
+                                        height: 24,
+                                        decoration: BoxDecoration(
+                                          color: events[index]
+                                              .$5
+                                              .withValues(alpha: 0.14),
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: events[index]
+                                                  .$5
+                                                  .withValues(alpha: 0.15),
+                                              blurRadius: 8,
+                                            ),
+                                          ],
+                                        ),
+                                        child: Icon(
+                                          events[index].$4,
+                                          size: 14,
+                                          color: events[index].$5,
+                                        ),
+                                      ),
+                                      if (index < events.length - 1)
+                                        Container(
+                                          width: 2,
+                                          height: 22,
+                                          margin: const EdgeInsets.symmetric(
+                                            vertical: 3,
+                                          ),
+                                          color: connectorColor,
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(bottom: 14),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          events[index].$2,
+                                          style: TextStyle(
+                                            color: primaryColor,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          events[index].$1 == null
+                                              ? 'Time not recorded'
+                                              : DateFormat(
+                                                  'd MMM yyyy · HH:mm',
+                                                ).format(events[index].$1!),
+                                          style: TextStyle(
+                                            color: accentColor,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          events[index].$3,
+                                          style: TextStyle(
+                                            color: secondaryColor,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
+
   Widget _buildIssuanceTable() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Card(
@@ -3966,30 +4429,22 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                     item.isPending && item.checkOutDate != null;
                 final parsedCheckoutDate = item.checkOutDate == null
                     ? null
-                    : DateTime.tryParse(item.checkOutDate!);
+                    : DateTime.tryParse(item.checkOutDate!) ??
+                        DateFormat('dd-MMM-yyyy').tryParse(item.checkOutDate!);
                 final checkoutLabel = parsedCheckoutDate == null
                     ? item.checkOutDate
                     : DateFormat('d MMM yyyy').format(parsedCheckoutDate);
-                final statusColor = item.isMissing
-                    ? (isDark
-                        ? const Color(0xFFFF9A9A)
-                        : RamadaColors.dangerText)
-                    : (item.isFullyReturned
-                        ? (isDark
-                            ? const Color(0xFF7BE0A6)
-                            : RamadaColors.successText)
-                        : (isDark
-                            ? const Color(0xFFFFD180)
-                            : RamadaColors.warningText));
-                final statusBackground = item.isMissing
-                    ? (isDark ? const Color(0xFF4A2528) : RamadaColors.dangerBg)
-                    : (item.isFullyReturned
-                        ? (isDark
-                            ? const Color(0xFF173E2C)
-                            : RamadaColors.successBg)
-                        : (isDark
-                            ? const Color(0xFF4A3518)
-                            : RamadaColors.warningBg));
+                final isLongStay = item.isPending &&
+                    parsedCheckoutDate != null &&
+                    DateUtils.dateOnly(parsedCheckoutDate)
+                        .isBefore(DateUtils.dateOnly(DateTime.now()));
+                final keyStatus = item.isMissing
+                    ? KeyStatus.missing
+                    : item.isFullyReturned
+                        ? KeyStatus.returned
+                        : isLongStay
+                            ? KeyStatus.longStay
+                            : KeyStatus.issued;
 
                 return DataRow(
                   cells: [
@@ -4014,46 +4469,27 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                     DataCell(
                       SizedBox(
                         width: columnWidths[6],
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 5, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: statusBackground,
-                            borderRadius: BorderRadius.circular(5),
-                            border: Border.all(
-                              color: statusColor.withValues(alpha: 0.2),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            KeyStatusBadge(
+                              status: keyStatus,
+                              isDark: isDark,
                             ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
+                            if (hasScheduledCheckout)
                               Text(
-                                item.isMissing
-                                    ? 'MISSING'
-                                    : (item.isFullyReturned
-                                        ? 'RETURNED'
-                                        : 'PENDING'),
-                                maxLines: 1,
+                                'Check-out $checkoutLabel',
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: statusColor,
+                                  fontSize: 9,
+                                  color: isDark
+                                      ? RamadaColors.charcoalMuted
+                                      : const Color(0xFF526174),
                                 ),
                               ),
-                              if (hasScheduledCheckout)
-                                Text(
-                                  'Check-out $checkoutLabel',
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    color: statusColor,
-                                  ),
-                                ),
-                            ],
-                          ),
+                          ],
                         ),
                       ),
                     ),
