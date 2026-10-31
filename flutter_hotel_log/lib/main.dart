@@ -1750,7 +1750,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
   final FocusNode _searchFocusNode = FocusNode();
   String dutyStaffName = "";
   String selectedDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
-  String selectedShift = "Morning (07:00 - 15:00)";
+  String selectedShift = "Morning (08:00 - 17:00)";
   String searchQuery = "";
   String activeFilter = "ALL"; // ALL, PENDING, RETURNED, MISSING, CARRIED
   bool _showTimeline = false;
@@ -1768,9 +1768,10 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
   Timer? _dailyReportTimer;
 
   final List<String> shifts = [
-    "Morning (07:00 - 15:00)",
-    "Afternoon (15:00 - 23:00)",
-    "Night (23:00 - 07:00)",
+    "Morning (08:00 - 17:00)",
+    "Afternoon (15:00 - 00:00)",
+    "Swing/Evening (18:00 - 03:00)",
+    "Night (00:00 - 09:00)",
     "All Shifts"
   ];
 
@@ -1806,12 +1807,13 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
     super.dispose();
   }
 
-  String _shiftFor(DateTime dateTime) =>
-      dateTime.hour < 7 || dateTime.hour >= 23
-          ? shifts[2]
-          : dateTime.hour < 15
-              ? shifts[0]
-              : shifts[1];
+  String _shiftFor(DateTime dateTime) {
+    final hour = dateTime.hour;
+    if (hour < 9) return shifts[3];
+    if (hour < 15) return shifts[0];
+    if (hour < 18) return shifts[1];
+    return shifts[2];
+  }
 
   String _localDutyShiftKey(String shiftDate) =>
       'duty_shift_${widget.session.user.id}_$shiftDate';
@@ -1819,7 +1821,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
   Future<String?> _loadLocalDutyShift(String shiftDate) async {
     final preferences = await SharedPreferences.getInstance();
     final shift = preferences.getString(_localDutyShiftKey(shiftDate));
-    return shifts.take(3).contains(shift) ? shift : null;
+    return shifts.take(4).contains(shift) ? shift : null;
   }
 
   Future<bool> _saveLocalDutyShift(String shiftDate, String shift) async {
@@ -1854,7 +1856,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
           debugPrint('Could not refresh assigned shift: $error\n$stackTrace');
         }
         assignedShift ??= await _loadLocalDutyShift(today);
-        if (assignedShift != null && shifts.take(3).contains(assignedShift)) {
+        if (assignedShift != null && shifts.take(4).contains(assignedShift)) {
           shiftForToday = assignedShift;
         }
       }
@@ -1898,7 +1900,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
           debugPrint('Could not restore assigned shift: $error\n$stackTrace');
         }
         assignedShift ??= await _loadLocalDutyShift(selectedDate);
-        if (assignedShift != null && shifts.take(3).contains(assignedShift)) {
+        if (assignedShift != null && shifts.take(4).contains(assignedShift)) {
           selectedShift = assignedShift;
         }
       }

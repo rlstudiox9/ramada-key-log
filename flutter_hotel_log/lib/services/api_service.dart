@@ -605,11 +605,10 @@ class ApiService {
 
   static String _shiftFromDate(DateTime? issuedAt) {
     if (issuedAt == null) return 'All Shifts';
-    if (issuedAt.hour < 7 || issuedAt.hour >= 23) {
-      return 'Night (23:00 - 07:00)';
-    }
-    if (issuedAt.hour < 15) return 'Morning (07:00 - 15:00)';
-    return 'Afternoon (15:00 - 23:00)';
+    if (issuedAt.hour < 9) return 'Night (00:00 - 09:00)';
+    if (issuedAt.hour < 15) return 'Morning (08:00 - 17:00)';
+    if (issuedAt.hour < 18) return 'Afternoon (15:00 - 00:00)';
+    return 'Swing/Evening (18:00 - 03:00)';
   }
 
   static String? _asNullableString(dynamic value) {
