@@ -1757,6 +1757,7 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
   int _selectedDashboardSection = 0;
   bool _isLoading = true;
   String? _storageError;
+  String? _staffRosterSyncError;
   String? _inventorySyncError;
   bool _isRefreshingInventory = false;
   bool _isCheckingDailyReport = false;
@@ -1874,43 +1875,78 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
   }
 
   Future<void> _loadSavedData() async {
+    final now = DateTime.now();
+    selectedDate = DateFormat('yyyy-MM-dd').format(now);
+    selectedShift = _shiftFor(now);
+    _lastActiveDate = selectedDate;
+    _lastActiveShift = _shiftFor(now);
     try {
       final preferences = await SharedPreferences.getInstance();
-      final now = DateTime.now();
-      selectedDate = DateFormat('yyyy-MM-dd').format(now);
-      selectedShift = _shiftFor(now);
-      _lastActiveDate = selectedDate;
-      _lastActiveShift = _shiftFor(now);
       dutyStaffName = preferences.getString('duty_staff_name') ?? dutyStaffName;
-      staffRoster = await widget.apiService.getStaffRoster(
-        token: widget.session.accessToken,
-      );
-      totalInventory = await widget.apiService.getInventoryLimit(
-        token: widget.session.accessToken,
-      );
+    } catch (error, stackTrace) {
+      debugPrint('Failed to load local dashboard preferences: $error\n$stackTrace');
+    }
+
+    var logsLoaded = false;
+    try {
       issuances = await widget.apiService.getLogs();
-      if (!widget.session.user.isAdmin) {
-        String? assignedShift;
-        try {
-          assignedShift = await widget.apiService.getStaffShiftAssignment(
-            shiftDate: selectedDate,
-            token: widget.session.accessToken,
-          );
-        } catch (error, stackTrace) {
-          debugPrint('Could not restore assigned shift: $error\n$stackTrace');
-        }
-        assignedShift ??= await _loadLocalDutyShift(selectedDate);
-        if (assignedShift != null && shifts.take(4).contains(assignedShift)) {
-          selectedShift = assignedShift;
-        }
-      }
-      await _syncCarryForward();
+      logsLoaded = true;
+      _storageError = null;
     } catch (error, stackTrace) {
       debugPrint('Failed to load key logs from API: $error\n$stackTrace');
       _storageError = 'Key logs could not be loaded from the API: $error';
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
+    if (mounted) setState(() => _isLoading = false);
+
+    try {
+      staffRoster = await widget.apiService.getStaffRoster(
+        token: widget.session.accessToken,
+      );
+      _staffRosterSyncError = null;
+    } catch (error, stackTrace) {
+      debugPrint('Failed to load staff roster from API: $error\n$stackTrace');
+      _staffRosterSyncError = 'Staff roster could not be loaded: $error';
+      if (error is ApiException && error.statusCode == 401) {
+        unawaited(widget.onSessionExpired());
+      }
+    }
+
+    try {
+      totalInventory = await widget.apiService.getInventoryLimit(
+        token: widget.session.accessToken,
+      );
+      _inventorySyncError = null;
+    } catch (error, stackTrace) {
+      debugPrint('Failed to load shared inventory: $error\n$stackTrace');
+      _inventorySyncError = 'Shared inventory could not be loaded: $error';
+      if (error is ApiException && error.statusCode == 401) {
+        unawaited(widget.onSessionExpired());
+      }
+    }
+
+    if (!widget.session.user.isAdmin) {
+      String? assignedShift;
+      try {
+        assignedShift = await widget.apiService.getStaffShiftAssignment(
+          shiftDate: selectedDate,
+          token: widget.session.accessToken,
+        );
+      } catch (error, stackTrace) {
+        debugPrint('Could not restore assigned shift: $error\n$stackTrace');
+      }
+      assignedShift ??= await _loadLocalDutyShift(selectedDate);
+      if (assignedShift != null && shifts.take(4).contains(assignedShift)) {
+        selectedShift = assignedShift;
+      }
+    }
+    if (logsLoaded) {
+      try {
+        await _syncCarryForward();
+      } catch (error, stackTrace) {
+        _reportApiError(error, stackTrace);
+      }
+    }
+    if (mounted) setState(() => _isLoading = false);
     if (mounted) unawaited(_checkForDailyReport());
   }
 
@@ -3428,15 +3464,31 @@ class _HotelDashboardScreenState extends State<HotelDashboardScreen> {
                       ],
                     ),
                   ),
-                  if (_storageError != null || _inventorySyncError != null)
+                  if (_storageError != null ||
+                      _inventorySyncError != null ||
+                      _staffRosterSyncError != null)
                     MaterialBanner(
-                      content: Text(_storageError ?? _inventorySyncError!),
+                      content: Text(
+                        _storageError ??
+                            _inventorySyncError ??
+                            _staffRosterSyncError!,
+                      ),
                       leading: const Icon(Icons.warning_amber),
                       actions: [
                         TextButton(
                           onPressed: () async {
                             try {
                               await _refreshLogs();
+                              final refreshedRoster =
+                                  await widget.apiService.getStaffRoster(
+                                token: widget.session.accessToken,
+                              );
+                              if (mounted) {
+                                setState(() {
+                                  staffRoster = refreshedRoster;
+                                  _staffRosterSyncError = null;
+                                });
+                              }
                               await _refreshSharedInventory();
                             } catch (error, stackTrace) {
                               _reportApiError(error, stackTrace);

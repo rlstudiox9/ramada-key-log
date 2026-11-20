@@ -232,10 +232,40 @@ class ApiService {
   }
 
   Future<List<KeyIssuanceItem>> getLogs() async {
-    final response = await _client.get(
-      _baseUri.resolve('/logs'),
-      headers: _authHeaders,
-    );
+    const retryDelays = [
+      Duration(milliseconds: 500),
+      Duration(seconds: 1),
+    ];
+    var attempt = 0;
+    late http.Response response;
+    while (true) {
+      try {
+        response = await _client
+            .get(
+              _baseUri.resolve('/logs'),
+              headers: _authHeaders,
+            )
+            .timeout(const Duration(seconds: 35));
+      } on TimeoutException {
+        if (attempt >= retryDelays.length) rethrow;
+        await Future<void>.delayed(retryDelays[attempt++]);
+        continue;
+      } on http.ClientException {
+        if (attempt >= retryDelays.length) rethrow;
+        await Future<void>.delayed(retryDelays[attempt++]);
+        continue;
+      } catch (error) {
+        if (!network_errors.isSocketException(error) ||
+            attempt >= retryDelays.length) {
+          rethrow;
+        }
+        await Future<void>.delayed(retryDelays[attempt++]);
+        continue;
+      }
+
+      if (response.statusCode < 500 || attempt >= retryDelays.length) break;
+      await Future<void>.delayed(retryDelays[attempt++]);
+    }
     _checkResponse(response, expectedStatusCode: 200);
     final decoded = jsonDecode(response.body);
     if (decoded is! List) {
